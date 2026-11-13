@@ -6,6 +6,8 @@ import { renderBoard, layout, tick, openLibrary, initLibrary, optsOf, refreshAll
 import { initSettings, openSettings } from './settings.js';
 import * as clock from './clock.js';
 import { phoneQuery } from './grid.js';
+import { createEngine } from './scene/engine.js';
+import { startBackground } from './scene/background.js';
 
 // first-visit board (Task 14 tunes the composition)
 export const DEFAULT_WIDGETS = [
@@ -35,9 +37,12 @@ const ctx = {
   weather: {get: async () => null, at: () => null, label: () => ''},
   replaceState(s){ state = s; ctx.save(); renderBoard(ctx); ctx.onPlacesChange?.(); },
   reset(){ ctx.replaceState(defaultState(DEFAULT_WIDGETS.filter(w => WIDGETS[w.type]))); toast('Board reset.'); },
-  onPlacesChange: () => refreshAll(),
-  onFormatChange: () => refreshAll(),
+  onPlacesChange: () => { refreshAll(); bg?.repaint(); },
+  onFormatChange: () => { refreshAll(); bg?.repaint(); },
+  onBackgroundChange: () => bg?.modeChanged(),
+  openSettings: () => openSettings(),
 };
+let bg = null;
 window.dayscape = ctx;            // handy for debugging in the console
 
 renderBoard(ctx);
@@ -48,4 +53,6 @@ $('#settingsBtn').addEventListener('click', openSettings);
 clock.onTime(tick);
 phoneQuery.addEventListener('change', layout);
 let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(layout, 60); });
+bg = startBackground(ctx, createEngine($('#scene')));
+ctx.background = bg;
 document.documentElement.dataset.ready = '1';

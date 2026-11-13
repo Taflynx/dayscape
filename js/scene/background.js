@@ -1,0 +1,128 @@
+// The living background: picks this visit's scene, paints it at the displayed time, and shows the caption.
+import { $, esc } from '../util.js';
+import { localParts, fmtTime } from '../time.js';
+import { paintSky, rgb, lum } from './sky.js';
+import { pickScene } from './pick.js';
+import meadow from './scenes/meadow.js';
+
+export { pickScene };
+export const SCENES = [meadow];
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+/** Where a scene's time and weather come from: its own place, or home for the meadow. */
+export const sceneHome = (scene, ctx) => scene.place || ctx.places.home();
+
+export function startBackground(ctx, engine){
+  const st = () => ctx.state;
+  let scene = null, captionKey = '', menu = null;
+
+  function show(s){
+    scene = s;
+    st().bg = {...st().bg, last: s.id};
+    ctx.save();
+    engine?.setScene(s);
+    captionKey = '';
+    paint();
+  }
+
+  function choose(excludeCurrent){
+    const bg = {...st().bg};
+    if (excludeCurrent){ bg.mode = bg.mode === 'pinned' ? 'all' : bg.mode; bg.last = scene?.id ?? bg.last; }
+    return pickScene(SCENES, bg, st().places.map(p => p.name));
+  }
+
+  function hourFrac(T){
+    const p = localParts(sceneHome(scene, ctx).tz, T);
+    return p.h + p.mi / 60 + p.s / 3600;
+  }
+
+  function paint(){
+    if (!scene) return;
+    const T = ctx.clock.getT(), home = sceneHome(scene, ctx);
+    const sky = engine ? engine.sky : {};
+    const veil = engine ? Math.min(.85, Math.max(0, (engine.live.coverT - .6) / .35)) : 0;
+    paintSky(sky, hourFrac(T), veil);
+    const root = document.documentElement.style;
+    root.setProperty('--s1', rgb(sky.s1)); root.setProperty('--s2', rgb(sky.s2)); root.setProperty('--s3', rgb(sky.s3));
+    document.body.classList.toggle('day', lum(sky.s2) > 0.62);
+    const tc = $('#themeColor'); if (tc) tc.content = rgb(sky.s1);
+    caption(T, home);
+  }
+
+  function caption(T, home){
+    const wx = ctx.weather.label?.(home, T) || '';
+    const text = [home.name, fmtTime(T, home.tz, st().h12), wx].filter(Boolean).join(' · ');
+    if (text === captionKey) return;
+    captionKey = text;
+    const c = $('#caption');
+    c.textContent = text; c.hidden = false;
+    c.setAttribute('aria-label', `Background: ${text}. Open background options`);
+  }
+
+  // ----- caption menu -----
+  function closeMenu(){ menu?.remove(); menu = null; }
+  function openMenu(){
+    if (menu){ closeMenu(); return; }
+    menu = document.createElement('div');
+    menu.className = 'pop bg-menu';
+    menu.setAttribute('role', 'menu');
+    const pinned = st().bg.mode === 'pinned' && st().bg.pinned === scene.id;
+    menu.innerHTML = `<div class="pop-title">${esc(scene.name)}</div>
+      <button class="lnk" role="menuitem" data-act="next"${SCENES.length < 2 ? ' disabled' : ''}>Next scene</button>
+      <button class="lnk" role="menuitem" data-act="pin"${pinned ? ' disabled' : ''}>${pinned ? 'Kept as your scene' : 'Keep this scene'}</button>
+      <button class="lnk" role="menuitem" data-act="settings">Background settings…</button>`;
+    document.body.append(menu);
+    const r = $('#caption').getBoundingClientRect();
+    menu.style.left = Math.max(8, r.left - 6) + 'px';
+    menu.style.bottom = (innerHeight - r.top + 8) + 'px';
+    menu.querySelector('button:not([disabled])')?.focus();
+    menu.addEventListener('click', e => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+      closeMenu();
+      if (act === 'next') show(choose(true));
+      else if (act === 'pin'){
+        st().bg = {...st().bg, mode: 'pinned', pinned: scene.id}; ctx.save();
+        ctx.toast(`${scene.name} stays as your background.`);
+      } else ctx.openSettings?.('bg');
+    });
+  }
+  $('#caption').addEventListener('click', e => { e.stopPropagation(); openMenu(); });
+  document.addEventListener('pointerdown', e => { if (menu && !menu.contains(e.target) && e.target !== $('#caption')) closeMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && menu){ closeMenu(); $('#caption').focus(); } });
+
+  // ----- loop -----
+  if (engine){
+    document.body.classList.add('gl');
+    let last = 0;
+    const loop = now => {
+      requestAnimationFrame(loop);
+      if (document.hidden){ last = 0; return; }
+      const dt = last ? Math.min(.1, (now - last) / 1000) : 0;
+      last = now;
+      paint();
+      engine.frame(reduceMotion.matches ? 0 : dt);
+    };
+    let rt;
+    addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => engine.resize(), 80); });
+    engine.resize();
+    requestAnimationFrame(loop);
+  } else {
+    ctx.clock.onTime(paint);
+  }
+
+  show(choose(false));
+
+  return {
+    engine,
+    get scene(){ return scene; },
+    next: () => show(choose(true)),
+    /** Settings changed the mode: a pinned mode with nothing pinned keeps what is showing. */
+    modeChanged(){
+      const bg = st().bg;
+      if (bg.mode === 'pinned' && !SCENES.some(s => s.id === bg.pinned)){ st().bg = {...bg, pinned: scene.id}; ctx.save(); }
+    },
+    repaint(){ captionKey = ''; paint(); },
+  };
+}
