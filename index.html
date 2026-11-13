@@ -14,9 +14,61 @@
 <body>
 <div class="sky"></div>
 <canvas id="scene" aria-hidden="true"></canvas>
-<header class="bar" id="bar"></header>
+<header class="bar" id="bar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 44 32" aria-hidden="true"><path d="M3 24c7-9 12-12 19-12s12 3 19 12z" fill="#3F6B2E"/><path d="M3 24c5-5 9-7 13-7s8 2 12 7z" fill="#5C8A3A"/><circle cx="29" cy="10" r="6" fill="#EE8A3A"/><circle cx="29" cy="10" r="3.2" fill="#F7B961"/><path d="M3 26.5h38" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <span>dayscape</span>
+  </div>
+  <button class="nav-link mono" id="settingsBtn">Settings</button>
+  <button class="btn" id="addBtn">Add widget</button>
+</header>
 <main id="board" aria-label="Your widgets"></main>
+<button class="caption mono" id="caption" hidden></button>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<dialog class="drawer" id="library" aria-label="Add a widget">
+  <div class="drawer-head"><h2>Add a widget</h2><button class="x" data-close aria-label="Close">×</button></div>
+  <ul class="lib-list"></ul>
+</dialog>
+
+<dialog class="drawer" id="settings" aria-label="Settings">
+  <div class="drawer-head"><h2>Settings</h2><button class="x" data-close aria-label="Close">×</button></div>
+  <section class="set">
+    <h3>Places you follow</h3>
+    <p class="hint">Clocks, the timeline, weather and the background use this list. Drag to reorder, click a name to rename.</p>
+    <ul class="pl-list" id="plList"></ul>
+    <div class="pl-add">
+      <input id="plQuery" type="search" placeholder="Add a city or time zone" autocomplete="off" aria-label="Add a city or time zone">
+      <ul class="pl-res" id="plRes"></ul>
+    </div>
+    <button class="lnk" id="locateBtn">Use my location</button>
+  </section>
+  <section class="set">
+    <h3>Clock</h3>
+    <div class="seg" role="radiogroup" aria-label="Clock format">
+      <label><input type="radio" name="fmt" value="24"><span>24-hour</span></label>
+      <label><input type="radio" name="fmt" value="12"><span>12-hour</span></label>
+    </div>
+  </section>
+  <section class="set">
+    <h3>Background</h3>
+    <div class="radios">
+      <label><input type="radio" name="bg" value="all"><span>Rotate through all scenes</span></label>
+      <label><input type="radio" name="bg" value="followed"><span>Rotate through places I follow</span></label>
+      <label><input type="radio" name="bg" value="pinned"><span>Keep one scene</span></label>
+    </div>
+  </section>
+  <section class="set">
+    <h3>Backup</h3>
+    <p class="hint">Save your board and places to a file, or restore them in another browser.</p>
+    <div class="pop-row">
+      <button class="btn sm" id="backupBtn">Back up</button>
+      <button class="btn sm ghost-btn" id="restoreBtn">Restore</button>
+      <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+    </div>
+    <button class="lnk danger" id="resetBtn">Reset board</button>
+  </section>
+</dialog>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
