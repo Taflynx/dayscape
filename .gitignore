@@ -1,0 +1,6 @@
+.DS_Store
+Thumbs.db
+.claude/
+.superpowers/
+node_modules/
+media/review/
