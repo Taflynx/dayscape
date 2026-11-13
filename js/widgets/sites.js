@@ -16,7 +16,9 @@ export default {
 
     function draw(){
       const list = sites();
-      el.innerHTML = `<ul class="tiles">${list.map(s => `<li class="tile" draggable="true" data-id="${esc(s.id)}">
+      // a restored backup could hold anything: only plain web addresses become links
+      const safe = list.map(s => ({...s, url: normalizeUrl(s.url)})).filter(s => s.url);
+      el.innerHTML = `<ul class="tiles">${safe.map(s => `<li class="tile" draggable="true" data-id="${esc(s.id)}">
           <a href="${esc(s.url)}" title="${esc(s.url)}"><span class="tile-ico"><img alt="" loading="lazy" src="${esc(icon(s.url))}"><b>${esc((s.name || '?').charAt(0))}</b></span><span class="tile-name">${esc(s.name)}</span></a>
           <button class="tile-more" type="button" aria-label="Options for ${esc(s.name)}" aria-haspopup="menu">⋯</button></li>`).join('')}
         <li class="tile tile-add"><button type="button" class="tile-plus" aria-label="Add a site"><span class="tile-ico">+</span><span class="tile-name">${list.length ? 'Add' : 'Add a site'}</span></button></li></ul>`;
