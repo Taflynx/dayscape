@@ -43,7 +43,7 @@ export function createWeather({fetchJSON, storage, now = Date.now}){
     try{
       const f = 'temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m';
       const d = 'temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset';
-      const j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&current=${f}&hourly=${f}&daily=${d}&past_days=1&forecast_days=7&timeformat=unixtime&timezone=GMT`);
+      const j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&current=${f}&hourly=${f}&daily=${d}&past_days=1&forecast_days=7&timeformat=unixtime&timezone=${encodeURIComponent(p.tz || 'GMT')}`);
       const h = j.hourly, dy = j.daily, ms = a => a.map(s => s * 1000);
       const fc = {
         lat: p.lat, lon: p.lon, fetched: now(),
