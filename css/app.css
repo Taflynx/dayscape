@@ -255,6 +255,56 @@ dialog.drawer::backdrop{background:rgba(23,20,15,.35)}
 @container (max-height:230px){.wx-days{display:none}}
 @container (max-height:150px){.wx-hours{display:none}}
 
+/* ---------- timer ---------- */
+.w-body.timerw{container-type:size;padding:0 14px 10px;align-items:center;justify-content:center;gap:6px;text-align:center}
+.tm-mode{transform:scale(.88)}
+.tm-phase{font-size:10px;color:var(--muted);min-height:12px}
+.tm-left{font-size:min(30cqh,22cqw);line-height:1;font-variant-numeric:tabular-nums}
+.timerw.running .tm-left{color:var(--forest)}
+.timerw.done .tm-left{color:var(--vermilion);animation:pulse 1s ease-in-out 3}
+@keyframes pulse{50%{opacity:.35}}
+.tm-presets{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.chip{height:26px;padding:0 10px;border-radius:13px;border:1.5px solid rgba(23,20,15,.3);background:rgba(251,246,234,.8);font:inherit;font-size:12px;cursor:pointer;color:var(--ink);display:inline-flex;align-items:center}
+.chip.on{border-color:var(--ink);background:var(--ink);color:var(--cream)}
+.chip-in input{width:44px;border:0;background:none;font:inherit;font-size:12px;text-align:center;color:var(--ink);outline:none}
+.tm-ctl{display:flex;gap:8px}
+@container (max-height:170px){.tm-presets,.tm-phase{display:none}}
+/* ---------- sun and moon ---------- */
+.w-body.sunmoon{container-type:size;flex-direction:row;align-items:center;gap:14px;padding:0 14px 10px}
+.sm-sun{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.sm-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:1px solid var(--rule);padding-bottom:6px}
+.sm-row .mono{font-size:10px;color:var(--muted)}
+.sm-row b{font-size:17px;font-variant-numeric:tabular-nums}
+.sm-polar{font-size:13px;font-weight:600}
+.sm-moon{display:flex;flex-direction:column;align-items:center;gap:3px;flex:none;width:min(42%,140px)}
+.moon{width:min(52cqh,92px);height:min(52cqh,92px)}
+.moon .dark{fill:#3A3866}
+.moon .lit{fill:#F6EFD8}
+.moon .rim{fill:none;stroke:var(--ink);stroke-width:2}
+.sm-name{font-size:13px;font-weight:600;text-align:center}
+.sm-lit{font-size:9.5px;color:var(--muted)}
+/* ---------- meeting planner ---------- */
+.w-body.plannerw{padding:0 14px 10px;overflow:auto;gap:6px}
+.pl-note{margin:0;font-size:12px;color:var(--vermilion);font-weight:600}
+.pl-slots{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.pl-slot{border-bottom:1px solid var(--rule);padding-bottom:8px}
+.pl-when{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pl-when b{font-size:18px;font-variant-numeric:tabular-nums}
+.pl-when .mono{font-size:10px;color:var(--muted)}
+.pl-locals{list-style:none;margin:4px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 12px;font-size:12px}
+.pl-locals li{display:flex;justify-content:space-between;gap:6px}
+.pl-locals .mono{font-size:10px;color:var(--muted);white-space:nowrap}
+/* ---------- currency ---------- */
+.w-body.fxw{padding:0 14px 10px;gap:8px}
+.fx-in{display:flex;align-items:center;gap:8px;border:1.5px solid var(--ink);border-radius:8px;background:rgba(251,246,234,.9);padding:0 12px;height:40px}
+.fx-in input{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:18px;font-weight:600;color:var(--ink);outline:none}
+.fx-in .mono{font-size:12px}
+.fx-list{list-style:none;margin:0;padding:0;flex:1;min-height:0;overflow:auto}
+.fx-list li{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--rule)}
+.fx-list .mono{font-size:11px;color:var(--muted)}
+.fx-list b{font-size:16px;font-variant-numeric:tabular-nums}
+.fx-src{font-size:9px;color:var(--muted)}
+
 /* ---------- caption and toast ---------- */
 .caption{position:fixed;left:18px;bottom:4px;z-index:6;font-size:11px;line-height:16px;padding:0;color:rgba(251,246,234,.9);text-shadow:0 1px 3px rgba(10,14,8,.6);cursor:pointer;background:none;border:0}
 .caption:hover{color:#FBF6EA;text-decoration:underline;text-underline-offset:3px}
