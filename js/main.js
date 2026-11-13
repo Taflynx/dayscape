@@ -1,5 +1,9 @@
 // Dayscape boot: load the saved board, render it, and wire the bar, drawers and clock.
-import { $ } from './util.js';
+import { $, uid } from './util.js';
+import { validTz, tzOffset } from './time.js';
+import { norm } from './places.js';
+import { createWeather } from './weather.js';
+import { getJSON, ipLookup, gpsLookup, browserTz } from './locate.js';
 import { loadState, saveState, defaultState } from './store.js';
 import { WIDGETS } from './widgets/index.js';
 import { renderBoard, layout, tick, openLibrary, initLibrary, optsOf, refreshAll } from './board.js';
@@ -34,15 +38,42 @@ const ctx = {
     byId: id => state.places.find(p => p.id === id),
   },
   clock, toast, knownTypes,
-  weather: {get: async () => null, at: () => null, label: () => ''},
+  weather: createWeather({fetchJSON: getJSON, storage}),
   replaceState(s){ state = s; ctx.save(); renderBoard(ctx); ctx.onPlacesChange?.(); },
   reset(){ ctx.replaceState(defaultState(DEFAULT_WIDGETS.filter(w => WIDGETS[w.type]))); toast('Board reset.'); },
   onPlacesChange: () => { refreshAll(); bg?.repaint(); },
   onFormatChange: () => { refreshAll(); bg?.repaint(); },
   onBackgroundChange: () => bg?.modeChanged(),
   openSettings: () => openSettings(),
+  locate,
 };
 let bg = null;
+
+// ----- location -----
+function setMyPlace(p, how){
+  if (!p.tz || !validTz(p.tz)) p.tz = browserTz();
+  const now = Date.now();
+  let c = state.places.find(x => norm(x.name) === norm(p.name) && tzOffset(x.tz, now) === tzOffset(p.tz, now));
+  state.places.forEach(x => delete x.me);
+  if (!c){ c = {id: uid(), name: p.name, country: p.country || '', cc: p.cc || '', tz: p.tz}; state.places.unshift(c); }
+  if (Number.isFinite(p.lat) && Number.isFinite(p.lon)){ c.lat = p.lat; c.lon = p.lon; }
+  c.me = true;
+  state.homeId = c.id; state.located = true;
+  ctx.save(); ctx.onPlacesChange();
+  toast(how === 'ip' ? `Found you near ${c.name} from your network. Use my location in Settings for a precise spot.` : `You're in ${c.name}. It's home now.`);
+}
+let locating = false;
+async function locate(){
+  if (locating) return;
+  locating = true;
+  try{
+    let p = null, how = 'gps';
+    if (navigator.geolocation){ try{ p = await gpsLookup(); }catch{} }
+    if (!p){ p = await ipLookup(); how = 'ip'; }
+    if (p) setMyPlace(p, how);
+    else toast("Couldn't find your location. Add your city under Places you follow.");
+  } finally { locating = false; }
+}
 window.dayscape = ctx;            // handy for debugging in the console
 
 renderBoard(ctx);
@@ -55,4 +86,6 @@ phoneQuery.addEventListener('change', layout);
 let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(layout, 60); });
 bg = startBackground(ctx, createEngine($('#scene')));
 ctx.background = bg;
+setInterval(() => bg.refreshWeather(), 15 * 60e3);
+if (!state.located) ipLookup().then(p => { if (p && p.name) setMyPlace(p, 'ip'); else { state.located = true; ctx.save(); } });
 document.documentElement.dataset.ready = '1';

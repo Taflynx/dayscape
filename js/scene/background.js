@@ -4,6 +4,7 @@ import { localParts, fmtTime } from '../time.js';
 import { paintSky, rgb, lum } from './sky.js';
 import { pickScene } from './pick.js';
 import meadow from './scenes/meadow.js';
+import { applyWeather, fmtTemp } from '../weather.js';
 
 export { pickScene };
 export const SCENES = [meadow];
@@ -15,15 +16,27 @@ export const sceneHome = (scene, ctx) => scene.place || ctx.places.home();
 
 export function startBackground(ctx, engine){
   const st = () => ctx.state;
-  let scene = null, captionKey = '', menu = null;
+  let scene = null, captionKey = '', menu = null, fc = null, fcFor = '', wxKey = '';
+
+  // the forecast for whatever place the scene shows; refreshed by the caller every 15 minutes
+  async function loadForecast(){
+    const p = sceneHome(scene, ctx), k = p.id || p.name, had = Number.isFinite(p.lat);
+    if (fcFor !== k){ fc = null; fcFor = k; }
+    const got = await ctx.weather.get(p);
+    if (fcFor !== k) return;              // the scene changed while we waited
+    if (!had && Number.isFinite(p.lat) && p.id) ctx.save();   // geocoded coordinates are kept on the place
+    fc = got; wxKey = ''; captionKey = ''; paint();
+  }
+  const conditions = T => fc ? (ctx.clock.isLive() ? ctx.weather.current(fc) : ctx.weather.at(fc, T)) : null;
 
   function show(s){
     scene = s;
     st().bg = {...st().bg, last: s.id};
     ctx.save();
     engine?.setScene(s);
-    captionKey = '';
+    captionKey = ''; wxKey = '';
     paint();
+    loadForecast();
   }
 
   function choose(excludeCurrent){
@@ -40,6 +53,9 @@ export function startBackground(ctx, engine){
   function paint(){
     if (!scene) return;
     const T = ctx.clock.getT(), home = sceneHome(scene, ctx);
+    const w = conditions(T);
+    const k = w ? [w.code, Math.round(w.cover), Math.round(w.wind), w.dir].join() : 'none';
+    if (engine && k !== wxKey){ wxKey = k; applyWeather(engine.live, w); }
     const sky = engine ? engine.sky : {};
     const veil = engine ? Math.min(.85, Math.max(0, (engine.live.coverT - .6) / .35)) : 0;
     paintSky(sky, hourFrac(T), veil);
@@ -47,11 +63,11 @@ export function startBackground(ctx, engine){
     root.setProperty('--s1', rgb(sky.s1)); root.setProperty('--s2', rgb(sky.s2)); root.setProperty('--s3', rgb(sky.s3));
     document.body.classList.toggle('day', lum(sky.s2) > 0.62);
     const tc = $('#themeColor'); if (tc) tc.content = rgb(sky.s1);
-    caption(T, home);
+    caption(T, home, w);
   }
 
-  function caption(T, home){
-    const wx = ctx.weather.label?.(home, T) || '';
+  function caption(T, home, w){
+    const wx = w ? `${fmtTemp(w.temp, home)} ${ctx.weather.label(w.code)}` : '';
     const text = [home.name, fmtTime(T, home.tz, st().h12), wx].filter(Boolean).join(' · ');
     if (text === captionKey) return;
     captionKey = text;
@@ -123,6 +139,7 @@ export function startBackground(ctx, engine){
       const bg = st().bg;
       if (bg.mode === 'pinned' && !SCENES.some(s => s.id === bg.pinned)){ st().bg = {...bg, pinned: scene.id}; ctx.save(); }
     },
-    repaint(){ captionKey = ''; paint(); },
+    repaint(){ captionKey = ''; paint(); loadForecast(); },
+    refreshWeather: loadForecast,
   };
 }
