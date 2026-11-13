@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#2E2F5A" id="themeColor">
+<title>Dayscape</title>
+<meta name="description" content="A home page of widgets you arrange yourself, over a living painted landscape of the places you follow.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23FBF6EA'/%3E%3Cpath d='M4 22c5-7 9-9 12-9s7 2 12 9z' fill='%233F6B2E'/%3E%3Ccircle cx='21' cy='11' r='5' fill='%23EE8A3A'/%3E%3Cpath d='M4 24.5h24' stroke='%2317140F' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="sky"></div>
+<canvas id="scene" aria-hidden="true"></canvas>
+<header class="bar" id="bar"></header>
+<main id="board" aria-label="Your widgets"></main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

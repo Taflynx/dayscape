@@ -1,0 +1,11 @@
+{
+  "name": "dayscape",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A home page of movable widgets over a living painted landscape.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "license": "MIT"
+}

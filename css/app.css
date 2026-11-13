@@ -1,0 +1,18 @@
+:root{
+  --ink:#17140F;
+  --cream:#FBF6EA;
+  --vermilion:#D9562B;
+  --forest:#1E4D3A;
+  --muted:#6B6253;
+  --glass:rgba(251,247,238,.74);
+  --rule:rgba(23,20,15,.1);
+  --s1:#1C2140; --s2:#2E2F5A; --s3:#4A3F6B;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--s2);color:var(--ink);font-family:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em}
+.display{font-family:Anton,Impact,sans-serif;font-weight:400}
+.sky{position:fixed;inset:0;background:linear-gradient(180deg,var(--s1),var(--s2) 50%,var(--s3))}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block}
