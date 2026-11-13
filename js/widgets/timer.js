@@ -1,5 +1,6 @@
 // A countdown timer and a Pomodoro. Runs on real time (not the scrubbed one) and survives a reload.
 import { pad } from '../time.js';
+import { uid } from '../util.js';
 
 const M = 60e3;
 const POMO = {work: 25 * M, break: 5 * M, long: 15 * M};
@@ -28,14 +29,15 @@ export default {
   defaults: {mode: 'countdown', dur: 10 * M, end: null, left: null, phase: 'work', round: 1},
   mount(el, w, ctx){
     el.classList.add('timerw');
+    const group = 'tm-' + uid();   // a local radio-group name, never taken from saved data
     const o = () => ctx.opts(w);
     const set = patch => { w.settings = {...w.settings, ...patch}; ctx.save(); draw(); };
     const duration = () => o().mode === 'pomodoro' ? POMO[o().phase] : o().dur;
     const remaining = () => { const s = o(); return s.end ? s.end - Date.now() : s.left ?? duration(); };
 
     el.innerHTML = `<div class="seg tm-mode" role="radiogroup" aria-label="Timer mode">
-        <label><input type="radio" name="m-${w.id}" value="countdown"><span>Timer</span></label>
-        <label><input type="radio" name="m-${w.id}" value="pomodoro"><span>Pomodoro</span></label></div>
+        <label><input type="radio" name="${group}" value="countdown"><span>Timer</span></label>
+        <label><input type="radio" name="${group}" value="pomodoro"><span>Pomodoro</span></label></div>
       <div class="tm-phase mono"></div>
       <div class="tm-left display" aria-live="off"></div>
       <div class="tm-presets"></div>
@@ -72,7 +74,7 @@ export default {
     }
 
     el.addEventListener('change', e => {
-      if (e.target.name === `m-${w.id}`) set({mode: e.target.value, end: null, left: null});
+      if (e.target.name === group) set({mode: e.target.value, end: null, left: null});
       else if (e.target.type === 'number'){ const m = Math.round(+e.target.value); if (m >= 1 && m <= 600) set({dur: m * M, end: null, left: null}); e.target.value = ''; }
     });
     el.addEventListener('click', e => {

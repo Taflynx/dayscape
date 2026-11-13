@@ -71,3 +71,16 @@ test('export then import round-trips the state', () => {
   s.widgets[1].settings = {text: 'hello', color: 'sage'};
   assert.deepEqual(importState(exportState(s)).state, s);
 });
+
+test('ids that are not plain tokens are refused, so they can never reach markup', () => {
+  const saved = JSON.stringify({v: 1, homeId: 'a', widgets: [
+    {id: 'w1', type: 'notes', x: 0, y: 0, w: 5, h: 4, settings: {}},
+    {id: '"><img src=x onerror=alert(1)>', type: 'notes', x: 5, y: 0, w: 5, h: 4, settings: {}},
+  ], places: [
+    {id: 'a', name: 'London', tz: 'Europe/London'},
+    {id: 'b"><svg>', name: 'Paris', tz: 'Europe/Paris'},
+  ]});
+  const s = loadState(mem(saved), DEFAULT_WIDGETS, KNOWN);
+  assert.deepEqual(s.widgets.map(w => w.id), ['w1']);
+  assert.deepEqual(s.places.map(p => p.id), ['a']);
+});

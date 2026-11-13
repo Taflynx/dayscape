@@ -9,6 +9,7 @@ const BG_MODES = ['all', 'followed', 'pinned'];
 const NOT_BACKUP = "This file isn't a Dayscape backup.";
 
 const cc = c => /^[a-z]{2}$/.test(c || '') ? c : '';
+const ID = /^[A-Za-z0-9_-]{1,40}$/;   // ids end up in markup and selectors: plain tokens only
 const int = (v, d = 0) => Number.isFinite(+v) ? Math.round(+v) : d;
 
 export function defaultState(defaultWidgets){
@@ -25,7 +26,7 @@ export function defaultState(defaultWidgets){
 export function validateState(obj, knownTypes){
   if (!obj || typeof obj !== 'object' || obj.v !== 1 || !Array.isArray(obj.places) || !Array.isArray(obj.widgets)) return null;
   const places = obj.places
-    .filter(p => p && typeof p.id === 'string' && typeof p.name === 'string' && validTz(p.tz))
+    .filter(p => p && typeof p.id === 'string' && ID.test(p.id) && typeof p.name === 'string' && validTz(p.tz))
     .map(p => {
       const q = {id: p.id, name: p.name, country: String(p.country || ''), cc: cc(p.cc), tz: p.tz};
       if (Number.isFinite(p.lat) && Number.isFinite(p.lon)){ q.lat = p.lat; q.lon = p.lon; }
@@ -34,7 +35,7 @@ export function validateState(obj, knownTypes){
     });
   if (!places.length) return null;
   const widgets = obj.widgets
-    .filter(w => w && typeof w.id === 'string' && typeof w.type === 'string' && (!knownTypes || knownTypes.includes(w.type)))
+    .filter(w => w && typeof w.id === 'string' && ID.test(w.id) && typeof w.type === 'string' && (!knownTypes || knownTypes.includes(w.type)))
     .map(w => ({id: w.id, type: w.type, x: int(w.x), y: int(w.y), w: Math.max(1, int(w.w, 1)), h: Math.max(1, int(w.h, 1)),
       settings: w.settings && typeof w.settings === 'object' ? w.settings : {}}));
   const bg = obj.bg && BG_MODES.includes(obj.bg.mode)
