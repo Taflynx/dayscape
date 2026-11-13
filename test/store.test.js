@@ -84,3 +84,12 @@ test('ids that are not plain tokens are refused, so they can never reach markup'
   assert.deepEqual(s.widgets.map(w => w.id), ['w1']);
   assert.deepEqual(s.places.map(p => p.id), ['a']);
 });
+
+test('the widget theme is kept when valid and falls back to auto', async () => {
+  const { validateState: v } = await import('../js/store.js');
+  const base = {v: 1, places: [{id: 'a', name: 'X', tz: 'UTC'}], widgets: []};
+  assert.equal(v({...base, theme: 'dark'}).theme, 'dark');
+  assert.equal(v({...base, theme: 'light'}).theme, 'light');
+  assert.equal(v({...base, theme: 'neon'}).theme, 'auto');
+  assert.equal(v(base).theme, 'auto');
+});

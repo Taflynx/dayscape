@@ -30,6 +30,7 @@ function render(){
       <button class="x" data-del="${esc(p.id)}" aria-label="Remove ${esc(p.name)}"${s.places.length < 2 ? ' disabled' : ''}>×</button></li>`).join('');
   $(`input[name="fmt"][value="${s.h12 ? '12' : '24'}"]`, d).checked = true;
   $(`input[name="bg"][value="${s.bg.mode}"]`, d).checked = true;
+  $(`input[name="theme"][value="${s.theme || 'auto'}"]`, d).checked = true;
   $('#plQuery', d).value = ''; $('#plRes', d).innerHTML = '';
   $('#resetBtn', d).textContent = 'Reset board';
 }
@@ -70,6 +71,7 @@ function onClick(e){
 async function onChange(e){
   const s = ctx.state;
   if (e.target.name === 'fmt'){ s.h12 = e.target.value === '12'; ctx.save(); ctx.onFormatChange?.(); }
+  else if (e.target.name === 'theme'){ s.theme = e.target.value; ctx.save(); ctx.applyTheme?.(); }
   else if (e.target.name === 'bg'){ s.bg = {...s.bg, mode: e.target.value}; ctx.save(); ctx.onBackgroundChange?.(); }
   else if (e.target.id === 'restoreFile'){
     const file = e.target.files[0]; e.target.value = '';

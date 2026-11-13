@@ -6,6 +6,7 @@ import { CITY_DATA, DEFAULT_PLACES } from './places.js';
 export const KEY = 'dayscape.v1';
 const APP = 'dayscape';
 const BG_MODES = ['all', 'followed', 'pinned'];
+const THEMES = ['auto', 'light', 'dark'];
 const NOT_BACKUP = "This file isn't a Dayscape backup.";
 
 const cc = c => /^[a-z]{2}$/.test(c || '') ? c : '';
@@ -16,7 +17,7 @@ export function defaultState(defaultWidgets){
   const places = DEFAULT_PLACES.map(n => CITY_DATA.find(c => c.name === n)).filter(Boolean)
     .map(c => ({id: uid(), name: c.name, country: c.country, cc: c.cc, tz: c.tz}));
   return {
-    v: 1, places, homeId: places[0].id, h12: false, located: false,
+    v: 1, places, homeId: places[0].id, h12: false, located: false, theme: 'auto',
     widgets: defaultWidgets.map(w => ({id: uid(), settings: {}, ...structuredClone(w)})),
     bg: {mode: 'all', pinned: null, last: null},
   };
@@ -43,7 +44,7 @@ export function validateState(obj, knownTypes){
     : {mode: 'all', pinned: null, last: null};
   return {
     v: 1, places, homeId: places.some(p => p.id === obj.homeId) ? obj.homeId : places[0].id,
-    h12: !!obj.h12, located: !!obj.located, widgets, bg,
+    h12: !!obj.h12, located: !!obj.located, widgets, bg, theme: THEMES.includes(obj.theme) ? obj.theme : 'auto',
   };
 }
 

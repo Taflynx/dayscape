@@ -59,3 +59,24 @@ test('readingOrder sorts by row then column', () => {
   const items = [{id: 'c', y: 2, x: 0, w: 1, h: 1}, {id: 'b', y: 0, x: 5, w: 1, h: 1}, {id: 'a', y: 0, x: 1, w: 1, h: 1}];
   assert.deepEqual(readingOrder(items), ['a', 'b', 'c']);
 });
+
+test('a floating item (a note) moves onto others without pushing them', () => {
+  const items = [{id: 'N', x: 10, y: 0, w: 4, h: 3, float: true}, {id: 'B', x: 0, y: 0, w: 4, h: 2}];
+  const out = moveItem(items, 'N', 1, 0);
+  assert.deepEqual(byId(out, 'N'), {id: 'N', x: 1, y: 0, w: 4, h: 3, float: true});
+  assert.equal(byId(out, 'B').y, 0);
+});
+
+test('a docked widget moved under a floating note is not pushed by it', () => {
+  const items = [{id: 'N', x: 0, y: 0, w: 4, h: 3, float: true}, {id: 'B', x: 10, y: 0, w: 4, h: 2}];
+  const out = moveItem(items, 'B', 0, 0);
+  assert.equal(byId(out, 'B').y, 0);
+  assert.equal(byId(out, 'N').y, 0);
+});
+
+test('findSpot ignores floating notes, and a floating item fits anywhere', () => {
+  const items = [{id: 'N', x: 0, y: 0, w: 24, h: 14, float: true}];
+  assert.deepEqual(findSpot(items, 4, 2), {x: 0, y: 0});
+  const full = [{id: 'A', x: 0, y: 0, w: 24, h: 14}];
+  assert.deepEqual(findSpot(full, 4, 3, true), {x: 0, y: 0});
+});

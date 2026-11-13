@@ -1,6 +1,6 @@
 // The board: renders every widget in its frame, moves and resizes them, and hosts the gear menu and the library.
 import { $, $$, esc, uid } from './util.js';
-import { moveItem, resizeItem, findSpot, readingOrder } from './grid-layout.js';
+import { moveItem, resizeItem, findSpot, readingOrder, COLS, ROWS } from './grid-layout.js';
 import { place, gesture, phoneQuery } from './grid.js';
 import { WIDGETS, LIBRARY } from './widgets/index.js';
 import { getT } from './clock.js';
@@ -11,6 +11,8 @@ const live = new Map();           // widget id -> {el, inst, mod}
 const GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
 
 export const optsOf = w => ({...WIDGETS[w.type].defaults, ...w.settings});
+// layout items: floating widgets (notes) sit above the board and take no room
+const items = () => ctx.state.widgets.map(w => ({...w, float: !!WIDGETS[w.type]?.float}));
 
 export function renderBoard(c){
   ctx = c; boardEl = $('#board');
@@ -23,7 +25,7 @@ export function renderBoard(c){
 
 function frameFor(w, mod){
   const el = document.createElement('section');
-  el.className = 'widget w-' + w.type;
+  el.className = 'widget w-' + w.type + (mod.float ? ' float' : '') + (!mod.float && w.settings?.clear ? ' clear' : '');
   el.dataset.id = w.id;
   el.innerHTML = `<header class="w-head"><span class="w-name mono">${esc(mod.name)}</span><button class="w-gear" aria-label="${esc(mod.name)} settings">${GEAR}</button></header>
     <div class="w-body"></div><span class="w-corner" aria-hidden="true"></span>`;
@@ -42,7 +44,7 @@ function mount(w){
     getItem: () => ctx.state.widgets.find(x => x.id === w.id),
     commit: r => {
       const cur = ctx.state.widgets.find(x => x.id === w.id);
-      const next = r.w !== cur.w || r.h !== cur.h ? resizeItem(ctx.state.widgets, w.id, r.w, r.h, mod.min) : moveItem(ctx.state.widgets, w.id, r.x, r.y);
+      const next = r.w !== cur.w || r.h !== cur.h ? resizeItem(items(), w.id, r.w, r.h, mod.min) : moveItem(items(), w.id, r.x, r.y);
       if (!next) return false;
       ctx.state.widgets = next.map(n => ({...ctx.state.widgets.find(x => x.id === n.id), x: n.x, y: n.y, w: n.w, h: n.h}));
       ctx.save(); layout();
@@ -77,11 +79,19 @@ export function layout(){
 
 export function tick(T){ for (const m of live.values()) m.inst.update?.(T); }
 
-export function addWidget(type){
+/** Adds a widget in the first free spot; a floating one (a note) lands beside `near`, or in the middle. */
+export function addWidget(type, near){
   const mod = WIDGETS[type];
-  const spot = findSpot(ctx.state.widgets, mod.size.w, mod.size.h) || findSpot(ctx.state.widgets, mod.min.w, mod.min.h);
-  if (!spot){ ctx.toast('No room on the board. Make space or remove a widget.'); return false; }
-  const fits = findSpot(ctx.state.widgets, mod.size.w, mod.size.h);
+  let spot, fits = true;
+  if (mod.float){
+    const n = ctx.state.widgets.filter(x => WIDGETS[x.type]?.float).length;
+    spot = near ? {x: Math.min(COLS - mod.size.w, near.x + 1), y: Math.min(ROWS - mod.size.h, near.y + 1)}
+      : {x: Math.min(COLS - mod.size.w, 9 + n % 5), y: Math.min(ROWS - mod.size.h, 3 + n % 5)};
+  } else {
+    spot = findSpot(items(), mod.size.w, mod.size.h) || findSpot(items(), mod.min.w, mod.min.h);
+    if (!spot){ ctx.toast('No room on the board. Make space or remove a widget.'); return false; }
+    fits = !!findSpot(items(), mod.size.w, mod.size.h);
+  }
   const w = {id: uid(), type, x: spot.x, y: spot.y, w: fits ? mod.size.w : mod.min.w, h: fits ? mod.size.h : mod.min.h, settings: {}};
   ctx.state.widgets.push(w); ctx.save(); mount(w); layout();
   const el = live.get(w.id).el; el.classList.add('fresh'); setTimeout(() => el.classList.remove('fresh'), 900);
@@ -129,6 +139,7 @@ export function openSettings(id){
   pop.setAttribute('role', 'dialog');
   pop.setAttribute('aria-label', m.mod.name + ' settings');
   pop.innerHTML = `<div class="pop-title">${esc(m.mod.name)}</div>${(m.mod.fields || []).map(f => field(f, o[f.key])).join('')}
+    ${m.mod.float ? '' : field({key: 'clear', label: 'Transparent background', kind: 'toggle'}, !!w.settings.clear)}
     ${phone ? '<div class="pop-row"><button class="lnk" data-act="up">Move up</button><button class="lnk" data-act="down">Move down</button></div>' : ''}
     <button class="lnk danger" data-act="remove">Remove widget</button>`;
   document.body.append(pop);

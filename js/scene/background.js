@@ -4,10 +4,11 @@ import { localParts, fmtTime } from '../time.js';
 import { paintSky, rgb, lum } from './sky.js';
 import { pickScene } from './pick.js';
 import meadow from './scenes/meadow.js';
+import montreal from './scenes/montreal.js';
 import { applyWeather, fmtTemp } from '../weather.js';
 
 export { pickScene };
-export const SCENES = [meadow];
+export const SCENES = [meadow, montreal];
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -108,6 +109,20 @@ export function startBackground(ctx, engine){
   document.addEventListener('pointerdown', e => { if (menu && !menu.contains(e.target) && e.target !== $('#caption')) closeMenu(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && menu){ closeMenu(); $('#caption').focus(); } });
 
+  // ----- crisp details over the painting (flags), redrawn every frame -----
+  const fx = $('#sceneFx'), fxc = fx?.getContext('2d');
+  let fxT = 0;
+  function drawFx(dt){
+    if (!fxc) return;
+    const W = innerWidth, H = innerHeight, s = Math.min(devicePixelRatio || 1, 2);
+    if (fx.width !== Math.round(W * s) || fx.height !== Math.round(H * s)){ fx.width = Math.round(W * s); fx.height = Math.round(H * s); }
+    fxc.setTransform(s, 0, 0, s, 0, 0);
+    fxc.clearRect(0, 0, W, H);
+    if (!scene?.overlay || !engine) return;
+    fxT += dt;
+    try{ scene.overlay(fxc, W, H, fxT, {night: engine.sky.night ?? 0, wind: engine.live.wind ?? .3}); }catch(e){ console.warn('Dayscape: scene overlay failed', e); }
+  }
+
   // ----- loop -----
   if (engine){
     document.body.classList.add('gl');
@@ -119,6 +134,7 @@ export function startBackground(ctx, engine){
       last = now;
       paint();
       engine.frame(reduceMotion.matches ? 0 : dt);
+      drawFx(reduceMotion.matches ? 0 : dt);
     };
     let rt;
     addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => engine.resize(), 80); });
@@ -139,6 +155,7 @@ export function startBackground(ctx, engine){
       const bg = st().bg;
       if (bg.mode === 'pinned' && !SCENES.some(s => s.id === bg.pinned)){ st().bg = {...bg, pinned: scene.id}; ctx.save(); }
     },
+    drawFx,
     repaint(){ captionKey = ''; paint(); loadForecast(); },
     refreshWeather: loadForecast,
   };

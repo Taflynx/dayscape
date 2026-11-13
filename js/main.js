@@ -6,7 +6,7 @@ import { createWeather } from './weather.js';
 import { getJSON, ipLookup, gpsLookup, browserTz } from './locate.js';
 import { loadState, saveState, defaultState } from './store.js';
 import { WIDGETS } from './widgets/index.js';
-import { renderBoard, layout, tick, openLibrary, initLibrary, optsOf, refreshAll } from './board.js';
+import { renderBoard, layout, tick, openLibrary, initLibrary, optsOf, refreshAll, addWidget } from './board.js';
 import { initSettings, openSettings } from './settings.js';
 import * as clock from './clock.js';
 import { phoneQuery } from './grid.js';
@@ -39,15 +39,24 @@ const ctx = {
   },
   clock, toast, knownTypes,
   weather: createWeather({fetchJSON: getJSON, storage}),
-  replaceState(s){ state = s; ctx.save(); renderBoard(ctx); ctx.onPlacesChange?.(); },
+  replaceState(s){ state = s; ctx.save(); applyTheme(); renderBoard(ctx); ctx.onPlacesChange?.(); },
   reset(){ ctx.replaceState(defaultState(DEFAULT_WIDGETS.filter(w => WIDGETS[w.type]))); toast('Board reset.'); },
   onPlacesChange: () => { refreshAll(); bg?.repaint(); },
   onFormatChange: () => { refreshAll(); bg?.repaint(); },
   onBackgroundChange: () => bg?.modeChanged(),
   openSettings: () => openSettings(),
+  addWidget: (type, near) => addWidget(type, near),
+  applyTheme,
   locate,
 };
 let bg = null;
+
+// widget look: light glass, smoked glass, or auto (smoked once the painted sky darkens)
+function applyTheme(){
+  const b = document.body.classList, t = state.theme || 'auto';
+  b.toggle('theme-auto', t === 'auto'); b.toggle('theme-light', t === 'light'); b.toggle('theme-dark', t === 'dark');
+}
+applyTheme();
 
 // ----- location -----
 function setMyPlace(p, how){

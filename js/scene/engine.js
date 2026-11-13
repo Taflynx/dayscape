@@ -71,10 +71,40 @@ void main(){
   o = vec4(clamp(skyV, 0., 1.), clamp(land, 0., 1.), layer / 3., s2.z);
 }`;
 
+const FS_FIELD_MASK = GLSL_COMMON + `
+uniform sampler2D uMask;
+uniform vec2 uCell[13];
+out vec4 o;
+vec4 mk(vec2 p){ return texture(uMask, clamp(p / uRes, vec2(0.), vec2(1.))); }
+float matOf(vec4 k){ return clamp(floor(k.r * 255. / 16. + .5), 0., 12.); }
+void main(){
+  vec2 p = vec2(gl_FragCoord.x, uRes.y * uScale - gl_FragCoord.y) / uScale;
+  vec2 ps = p + vec2(0., (vnoise(vec2(p.x / 260., 1.7)) - .5) * 70.);
+  vec3 a = stroke(ps, vec2(120., 24.), 1.), b = stroke(ps + 37., vec2(58., 13.), 2.);
+  float skyV = .5 + (a.x - .5) * .3 + (b.x - .5) * .18 + (vnoise(p / vec2(300., 70.)) - .5) * .2 + p.y / uRes.y * .05;
+  // brushy edges: look the material up a little off the pixel, by an amount that suits the material's strokes
+  float m0 = matOf(mk(p));
+  vec2 c0 = uCell[int(m0)];
+  float amp = m0 < .5 ? 3. : min(c0.x, c0.y) * .3;
+  vec2 jt = (vec2(vnoise(p / 9.), vnoise(p / 9. + 19.)) - .5) * 2. * amp;
+  vec4 k = mk(p + jt);
+  float m = matOf(k);
+  vec2 cell = uCell[int(m)];
+  bool vert = cell.y > cell.x;                 // tall cells paint vertical strokes (walls, towers)
+  vec2 sp = vert ? p.yx : p, sc = vert ? cell.yx : cell;
+  vec3 s1 = stroke(sp, sc, 4. + m), s2 = stroke(sp + 23., sc * .45, 8. + m);
+  float land = .5 + (s1.x - .5) * .42 + (s2.x - .5) * .2 + (vnoise(p / 40.) - .5) * .1;
+  float code = m + 16. * step(.5, mk(p + jt * .2).g) + 32. * step(.5, k.b);   // windows stay crisp
+  o = vec4(clamp(skyV, 0., 1.), clamp(land, 0., 1.), code / 255., s2.z);
+}`;
+
 const FS_MAIN = GLSL_COMMON + `
 uniform sampler2D uField;
 uniform vec3 uS1, uS2, uS3, uSun, uMoon;
 uniform float uNight, uDay, uCover, uDrift, uT;
+uniform float uKind, uWave;
+uniform vec3 uPDay[13], uPNight[13];
+uniform float uGlow[13];
 out vec4 o;
 vec3 overlay(vec3 b, float a){ return mix(2. * a * b, 1. - 2. * (1. - a) * (1. - b), step(.5, b)); }
 float fbm(vec2 p){ float v = 0., a = .5; for (int i = 0; i < 4; i++){ v += a * vnoise(p); p = p * 2.03 + 17.; a *= .5; } return v; }
@@ -95,8 +125,10 @@ void main(){
   vec4 f = texelFetch(uField, ivec2(gl_FragCoord.xy), 0);
   vec2 p = vec2(gl_FragCoord.x, uRes.y * uScale - gl_FragCoord.y) / uScale;
   float y = p.y / uRes.y, layer = floor(f.b * 3. + .5);
+  float code = floor(f.b * 255. + .5), m = mod(code, 16.), win = mod(floor(code / 16.), 2.), wat = floor(code / 32.);
+  bool skyPix = uKind < .5 ? layer < .5 : m < .5;
   vec3 c;
-  if (layer < .5){
+  if (skyPix){
     vec3 g = y < .42 ? mix(uS1, uS2, y / .42) : mix(uS2, uS3, clamp((y - .42) / .28, 0., 1.));
     c = overlay(g, f.r);
     vec2 sc = floor(p / 38.); vec4 sh = hash4(sc + 5.1);
@@ -119,10 +151,41 @@ void main(){
       }
     }
     c += star * uNight * vec3(1., .98, .9);
-  } else {
+  } else if (uKind < .5){
     vec3 base = layer < 1.5 ? vec3(.463, .573, .518) : layer < 2.5 ? vec3(.259, .369, .251) : vec3(.18, .29, .133);
     c = mix(base + (f.g - .5) * .22, vec3(.78, .75, .59), f.a * .07);
     c = landAdjust(c);
+  } else {
+    int mi = int(m);
+    // the day colour goes through the daylight grade; the night colour is the author's own, used as painted
+    vec3 dayC = landAdjust(mix(uPDay[mi] + (f.g - .5) * .2, vec3(.78, .75, .59), f.a * .05));
+    vec3 nightC = uPNight[mi] + (f.g - .5) * .12;
+    c = mix(dayC, nightC, uNight);
+    c *= 1. - win * .16 * (1. - uNight);   // by day, window glass reads as a slightly darker grid
+    if (wat > .5){
+      // the river mirrors the sky above it, broken into ripples that move with the wind
+      float yy = clamp(.6 - (y - .6) * 1.5, 0., 1.);
+      vec3 g = yy < .42 ? mix(uS1, uS2, yy / .42) : mix(uS2, uS3, clamp((yy - .42) / .28, 0., 1.));
+      float rip = vnoise(vec2(p.x / 70. + uT * .3 * (.3 + uWave), p.y / 2.6)), rip2 = vnoise(vec2(p.x / 23. - uT * .5, p.y / 1.4));
+      vec3 refl = g * (.72 + rip * .28 + rip2 * .1) * mix(.95, .8, uNight);
+      c = mix(c, refl, .7) + (f.g - .5) * .06;
+      for (int i = 0; i < 2; i++){
+        vec3 orbp = i == 0 ? uSun : uMoon;
+        if (orbp.z > 0. && orbp.y < .62){
+          float dx = abs(p.x - orbp.x * uRes.x), wd = 8. + max(0., y - .6) * uRes.y * .12;
+          float spark = smoothstep(.55, .8, vnoise(vec2(p.x / 5. + uT * 1.7, p.y / 1.8)));
+          c += exp(-dx * dx / (wd * wd)) * spark * orbp.z * (i == 0 ? vec3(1., .82, .5) * .75 : vec3(.92, .93, 1.) * .4);
+        }
+      }
+    }
+    if (win > .5){
+      // after dusk each window lights at its own moment and flickers a little; glowing landmarks are always on
+      vec2 wc = floor(p / vec2(6., 8.));
+      float h = hash1(wc + 3.7);
+      float on = uGlow[mi] > .5 ? smoothstep(.05, .35, uNight) : step(h, uNight * .85 - .08);
+      float fl = .88 + .12 * sin(uT * (1. + h * 3.) + h * 60.);
+      c = mix(c, vec3(1., .83, .5) * fl, on * .85);
+    }
   }
   c = grade(c, p.y) + (hash1(gl_FragCoord.xy) - .5) * .03;
   o = vec4(c, 1.);
@@ -223,7 +286,7 @@ export function createEngine(cv){
   };
   let P;
   try{
-    P = {field: program(VS_FULL, FS_FIELD), main: program(VS_FULL, FS_MAIN), blade: program(VS_BLADE, FS_BLADE), dab: program(VS_DAB, FS_DAB), fall: program(VS_FALL, FS_FALL)};
+    P = {field: program(VS_FULL, FS_FIELD), fieldMask: program(VS_FULL, FS_FIELD_MASK), main: program(VS_FULL, FS_MAIN), blade: program(VS_BLADE, FS_BLADE), dab: program(VS_DAB, FS_DAB), fall: program(VS_FALL, FS_FALL)};
   }catch(e){ console.warn('Dayscape: WebGL shaders failed, showing the plain sky.', e); return null; }
 
   const buf = (data, usage = gl.STATIC_DRAW) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, usage); return b; };
@@ -242,7 +305,7 @@ export function createEngine(cv){
   const fallBuf = buf(new Float32Array(Array.from({length: FALL_MAX * 4}, (_, i) => i % 4 === 2 ? .8 + R0() * .5 : i % 4 === 3 ? 10 + R0() * 16 : R0())));
   gl.bindVertexArray(fallVAO); attrib(0, lineVerts, 2, 2, 0, 0); attrib(1, fallBuf, 4, 4, 0, 1);
 
-  let fieldTex = null, W = 0, H = 0, S = 1, cw = 0, ch = 0, scene = null;
+  let fieldTex = null, W = 0, H = 0, S = 1, cw = 0, ch = 0, scene = null, palette = null;
   const fbo = gl.createFramebuffer();
 
   function upload(blades, dabs){
@@ -254,18 +317,24 @@ export function createEngine(cv){
     gl.bindVertexArray(dabVAO); attrib(0, quadVerts, 2, 2, 0, 0); attrib(1, dabBuf, 4, 12, 0, 1); attrib(2, dabBuf, 4, 12, 4, 1); attrib(3, dabBuf, 4, 12, 8, 1);
   }
 
-  function buildMeadow(){
+  // grass and wildflowers below topFn(x, H); topFn may return null where nothing grows
+  function buildGrass(topFn){
     const R = rng(3), blades = [], dabs = [];
-    const top0 = H * .79, count = Math.round(W * (H - top0) / 24);
+    let band = 0; for (let i = 0; i < 64; i++){ const t = topFn((i + .5) / 64 * W, H); band += t == null ? 0 : Math.max(0, H - t); }
+    const count = Math.round(W * band / 64 / 24);
     for (let i = 0; i < count; i++){
-      const x = R() * W, top = meaY(x, H), y = top + R() ** .8 * (H - top + 6), depth = (y - top) / (H - top + 1);
+      const x = R() * W, top = topFn(x, H);
+      if (top == null || top >= H) continue;
+      const y = top + R() ** .8 * (H - top + 6), depth = (y - top) / (H - top + 1);
       const c = mixC([30, 54, 28], [132, 160, 72], Math.min(1, R() * .8 + (1 - depth) * .2)).map(v => v / 255);
       blades.push([x, y, 7 + depth * 34 * (.6 + R() * .7), (R() - .5) * .45 + Math.sin(x / 90) * .1, R() * 6.28, .6 + R() * .7, 1 + depth * 2.2 * (.4 + R() * .6), ...c]);
     }
     // wildflowers: a stem plus a small stack of dabs that sway with it
     const FLOWERS = [[157, 134, 214], [199, 111, 176], [232, 195, 74], [242, 238, 224], [110, 127, 216], [226, 140, 90]];
-    for (let i = 0; i < W / 10; i++){
-      const x = R() * W, top = meaY(x, H), y = top + 6 + R() ** .9 * (H - top), depth = (y - top) / (H - top + 1);
+    for (let i = 0; i < W / 10 * Math.min(1, band / 64 / (H * .21)); i++){
+      const x = R() * W, top = topFn(x, H);
+      if (top == null || top >= H) continue;
+      const y = top + 6 + R() ** .9 * (H - top), depth = (y - top) / (H - top + 1);
       const fc = FLOWERS[(R() * FLOWERS.length) | 0], size = 1.2 + depth * 2.8, tall = R() < .5 ? 2 + (R() * 4 | 0) : 1;
       const sh = size * (tall + 2) * 1.6, ph = R() * 6.28, flex = .7 + R() * .5, lean = (R() - .5) * .2;
       blades.push([x, y, sh, lean, ph, flex, 1, 52 / 255, 84 / 255, 40 / 255]);
@@ -296,9 +365,51 @@ export function createEngine(cv){
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fieldTex, 0);
     gl.viewport(0, 0, cw, ch);
     gl.disable(gl.BLEND);   // the last frame leaves blending on; the field must be written as-is
-    common(P.field); gl.bindVertexArray(empty); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const mask = scene?.kind === 'mask' ? maskTexture() : null;
+    if (mask){
+      const f = P.fieldMask; common(f);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, mask); gl.uniform1i(f.u('uMask'), 1);
+      const cells = new Float32Array(26); cells.set([120, 24]);
+      (scene.palette || []).slice(0, 12).forEach((e, i) => cells.set(e.cell || [40, 10], (i + 1) * 2));
+      gl.uniform2fv(f.u('uCell'), cells);
+      gl.bindVertexArray(empty); gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.deleteTexture(mask); gl.activeTexture(gl.TEXTURE0);
+    } else {
+      common(P.field); gl.bindVertexArray(empty); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    buildMeadow();
+    buildGrass(mask ? (x, h) => scene.grass?.(x, h, W) ?? null : meaY);
+    palette = paletteUniforms(mask ? scene.palette : null);
+  }
+
+  // the scene's material mask, drawn in CSS pixels and cleaned so every pixel holds exactly one material
+  function maskTexture(){
+    const w = Math.max(1, Math.round(W)), h = Math.max(1, Math.round(H));
+    const cv2 = document.createElement('canvas'); cv2.width = w; cv2.height = h;
+    const c2 = cv2.getContext('2d', {willReadFrequently: true});
+    c2.fillStyle = '#000'; c2.fillRect(0, 0, w, h);
+    try{ scene.drawMask(c2, w, h); }catch(e){ console.warn('Dayscape: scene mask failed', e); }
+    const img = c2.getImageData(0, 0, w, h), d = img.data;
+    // antialiased edges blend two materials into a third; give such pixels their left or upper neighbour's material
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+      const i = (y * w + x) * 4, r = d[i], q = Math.round(r / 16);
+      if (Math.abs(r - q * 16) > 1 || q > 12) d[i] = x ? d[i - 4] : y ? d[i - w * 4] : 0;
+      else d[i] = q * 16;
+      d[i + 1] = d[i + 1] > 127 ? 255 : 0; d[i + 2] = d[i + 2] > 127 ? 255 : 0; d[i + 3] = 255;
+    }
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, d);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+
+  function paletteUniforms(pal){
+    const day = new Float32Array(39), night = new Float32Array(39), glow = new Float32Array(13);
+    (pal || []).slice(0, 12).forEach((e, i) => { day.set(e.day.map(v => v / 255), (i + 1) * 3); night.set((e.night || e.day).map(v => v / 255), (i + 1) * 3); glow[i + 1] = e.glow ? 1 : 0; });
+    return {day, night, glow, kind: pal ? 1 : 0};
   }
 
   function resize(){
@@ -335,6 +446,8 @@ export function createEngine(cv){
     gl.uniform3fv(m.u('uSun'), sky.sun); gl.uniform3fv(m.u('uMoon'), sky.moon);
     gl.uniform1f(m.u('uNight'), sky.night); gl.uniform1f(m.u('uDay'), sky.day);
     gl.uniform1f(m.u('uCover'), live.cover); gl.uniform1f(m.u('uDrift'), live.drift); gl.uniform1f(m.u('uT'), live.rt);
+    gl.uniform1f(m.u('uKind'), palette.kind); gl.uniform1f(m.u('uWave'), live.wind);
+    if (palette.kind){ gl.uniform3fv(m.u('uPDay'), palette.day); gl.uniform3fv(m.u('uPNight'), palette.night); gl.uniform1fv(m.u('uGlow'), palette.glow); }
     gl.bindVertexArray(empty); gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
