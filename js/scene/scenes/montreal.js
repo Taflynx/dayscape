@@ -1,6 +1,6 @@
 // Montreal as a postcard from the south shore: every landmark gathered in the open middle-right of the screen.
 // Mount Royal with Saint Joseph's Oratory, the downtown towers, Habitat 67 on the water, the leaning Olympic tower,
-// the Jacques Cartier Bridge landing beside the Biosphere, and the flags of Canada, Quebec and Montreal on the near bank.
+// and the Jacques Cartier Bridge landing beside the Biosphere.
 import { rng } from '../engine.js';
 
 const M = {mountain: 1, sphere: 2, glass: 3, stone: 4, dark: 5, copper: 6, concrete: 7, brick: 8, river: 9, steel: 10, bank: 11, trees: 12};
@@ -33,7 +33,6 @@ const chordAt = x => {
   }
   return 0;
 };
-export const FLAGS = [{x: .5, kind: 'canada'}, {x: .565, kind: 'quebec'}, {x: .63, kind: 'montreal'}];
 
 function drawMask(c, W, H){
   const fill = (m, g = 0, b = 0) => { c.fillStyle = `rgb(${m * 16},${g},${b})`; };
@@ -159,86 +158,9 @@ function drawMask(c, W, H){
   c.lineTo(W, H); c.closePath(); c.fill();
 }
 
-// ----- the three flags, drawn crisp over the painting and waving in the wind -----
-function leaf(c, x, y, s){
-  // the 11-point maple leaf, unit coordinates, centred, y down
-  const p = [[0,-1],[.13,-.74],[.3,-.82],[.25,-.4],[.55,-.62],[.48,-.44],[.84,-.5],[.72,-.3],[.9,-.2],[.46,.12],[.52,.3],[.06,.22],[.05,.62]];
-  c.beginPath();
-  p.forEach(([a, b], i) => i ? c.lineTo(x + a * s, y + b * s) : c.moveTo(x + a * s, y + b * s));
-  for (let i = p.length - 1; i >= 0; i--) c.lineTo(x - p[i][0] * s, y + p[i][1] * s);
-  c.closePath(); c.fill();
-}
-function fleur(c, x, y, s){
-  c.beginPath(); c.moveTo(x, y - s); c.quadraticCurveTo(x + s * .42, y - s * .3, x, y + s * .25); c.quadraticCurveTo(x - s * .42, y - s * .3, x, y - s); c.fill();
-  for (const d of [-1, 1]){
-    c.beginPath(); c.moveTo(x + d * s * .12, y + s * .1);
-    c.quadraticCurveTo(x + d * s * .95, y - s * .55, x + d * s * .6, y + s * .05);
-    c.quadraticCurveTo(x + d * s * .45, y + s * .3, x + d * s * .12, y + s * .3); c.fill();
-  }
-  c.fillRect(x - s * .5, y + s * .2, s, s * .16);
-  c.beginPath(); c.moveTo(x - s * .14, y + s * .36); c.lineTo(x, y + s * .8); c.lineTo(x + s * .14, y + s * .36); c.fill();
-}
-function paintFlag(c, kind, w, h){
-  if (kind === 'canada'){
-    c.fillStyle = '#fff'; c.fillRect(0, 0, w, h);
-    c.fillStyle = '#d52b1e'; c.fillRect(0, 0, w / 4, h); c.fillRect(w * .75, 0, w / 4, h);
-    leaf(c, w / 2, h * .5, h * .4);
-  } else if (kind === 'quebec'){
-    c.fillStyle = '#003da5'; c.fillRect(0, 0, w, h);
-    c.fillStyle = '#fff'; c.fillRect(w / 2 - h / 12, 0, h / 6, h); c.fillRect(0, h / 2 - h / 12, w, h / 6);
-    for (const [fx, fy] of [[.25, .25], [.75, .25], [.25, .75], [.75, .75]]) fleur(c, w * fx, h * fy - h * .03, h * .16);
-  } else {
-    // Montreal: a red cross on white, with the fleur-de-lis, rose, thistle and shamrock, and the white pine at the centre
-    c.fillStyle = '#fff'; c.fillRect(0, 0, w, h);
-    c.fillStyle = '#d0202e'; c.fillRect(w / 2 - h * .07, 0, h * .14, h); c.fillRect(0, h / 2 - h * .07, w, h * .14);
-    const s = h * .13;
-    c.fillStyle = '#1b4fa0'; fleur(c, w * .25, h * .24, s);
-    c.fillStyle = '#d0202e'; for (let i = 0; i < 5; i++){ const a = i / 5 * Math.PI * 2; c.beginPath(); c.arc(w * .75 + Math.cos(a) * s * .45, h * .25 + Math.sin(a) * s * .45, s * .42, 0, 7); c.fill(); }
-    c.fillStyle = '#f2c94c'; c.beginPath(); c.arc(w * .75, h * .25, s * .25, 0, 7); c.fill();
-    c.fillStyle = '#3c8a3c'; c.fillRect(w * .25 - 1, h * .75, 2, s * .9);
-    c.fillStyle = '#8a4fa8'; c.beginPath(); c.ellipse(w * .25, h * .72, s * .38, s * .5, 0, 0, 7); c.fill();
-    c.fillStyle = '#3c8a3c'; for (let i = 0; i < 3; i++){ const a = -Math.PI / 2 + i / 3 * Math.PI * 2; c.beginPath(); c.arc(w * .75 + Math.cos(a) * s * .38, h * .74 + Math.sin(a) * s * .38, s * .36, 0, 7); c.fill(); }
-    c.fillStyle = '#d0202e'; c.beginPath(); c.arc(w / 2, h / 2, h * .15, 0, 7); c.fill();
-    c.fillStyle = '#2f7a3a'; c.beginPath(); c.moveTo(w / 2, h * .38); c.lineTo(w / 2 + h * .09, h * .58); c.lineTo(w / 2 - h * .09, h * .58); c.closePath(); c.fill();
-  }
-}
-const flagCache = new Map();
-function overlay(c, W, H, t, {night = 0, wind = .3} = {}){
-  const fw = Math.max(40, W * .05), fh = fw / 2;
-  for (const f of FLAGS){
-    const px = W * f.x, base = shoreY(px, W, H) + 2, top = H * .47;
-    const k = f.kind + fw;
-    let img = flagCache.get(k);
-    if (!img){
-      img = document.createElement('canvas'); img.width = Math.ceil(fw * 2); img.height = Math.ceil(fh * 2);
-      const g = img.getContext('2d'); g.scale(2, 2); paintFlag(g, f.kind, fw, fh);
-      flagCache.set(k, img);
-    }
-    // pole
-    c.fillStyle = night > .5 ? '#5d6670' : '#cfd5da';
-    c.fillRect(px - 1.5, top - 4, 3, base - top + 4);
-    c.beginPath(); c.arc(px, top - 5, 3, 0, 7); c.fill();
-    // the cloth in vertical strips, each lifted by a travelling wave and shaded by its slope
-    const n = 24, sw = fw / n, amp = fh * (.05 + wind * .12), sp = 3 + wind * 5;
-    for (let i = 0; i < n; i++){
-      const u = i / n, ph = u * 7 - t * sp + f.x * 40;
-      const dy = Math.sin(ph) * amp * u, shade = Math.cos(ph) * .22 * Math.min(1, u * 3);
-      const sx = (i / n) * img.width;
-      c.drawImage(img, sx, 0, img.width / n + 1, img.height, px + 1.5 + i * sw * (.97 + .03 * Math.cos(ph)), top + dy, sw + .6, fh);
-      if (shade){ c.fillStyle = shade > 0 ? `rgba(255,255,255,${shade * .5})` : `rgba(0,0,20,${-shade})`; c.fillRect(px + 1.5 + i * sw * (.97 + .03 * Math.cos(ph)), top + dy, sw + .6, fh); }
-    }
-  }
-  if (night > .02){
-    // dusk and night: dim the cloth like the painting around it, with a little floodlight
-    c.globalCompositeOperation = 'source-atop';
-    c.fillStyle = `rgba(14,18,40,${Math.min(.62, night * .62)})`; c.fillRect(0, 0, W, H);
-    c.globalCompositeOperation = 'source-over';
-  }
-}
-
 export default {
   id: 'montreal', name: 'Montreal', kind: 'mask',
   place: {name: 'Montreal', cc: 'ca', tz: 'America/Toronto', lat: 45.5017, lon: -73.5673},
-  palette, drawMask, overlay,
+  palette, drawMask,
   grass: (x, H, W) => shoreY(x, W, H) + 5,
 };

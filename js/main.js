@@ -13,8 +13,14 @@ import { phoneQuery } from './grid.js';
 import { createEngine } from './scene/engine.js';
 import { startBackground } from './scene/background.js';
 
-// first-visit board (Task 14 tunes the composition)
+// first-visit board: keeps the middle of the screen (columns 12-18, rows 0-7) clear for the scene
 export const DEFAULT_WIDGETS = [
+  {type: 'search', x: 1, y: 0, w: 10, h: 2, settings: {}},
+  {type: 'clock', x: 1, y: 2, w: 7, h: 3, settings: {}},
+  {type: 'date', x: 8, y: 2, w: 3, h: 3, settings: {}},
+  {type: 'weather', x: 19, y: 0, w: 5, h: 5, settings: {}},
+  {type: 'sites', x: 1, y: 5, w: 10, h: 3, settings: {}},
+  {type: 'timeline', x: 1, y: 9, w: 16, h: 5, settings: {}},
   {type: 'notes', x: 18, y: 9, w: 6, h: 5, settings: {}},
 ];
 
