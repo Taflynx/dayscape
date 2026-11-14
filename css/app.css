@@ -34,8 +34,7 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;paddin
 
 /* ---------- bar ---------- */
 .bar{position:fixed;top:0;left:0;right:0;height:56px;z-index:10;display:flex;align-items:center;gap:6px;padding:0 16px;color:#FBF8F2;text-shadow:0 1px 3px rgba(10,14,8,.35)}
-.brand{display:flex;align-items:center;margin-right:auto}
-.brand .logo{width:157px;height:40px;flex:none;filter:drop-shadow(0 1px 3px rgba(10,14,8,.28))}
+.bar>:first-child{margin-left:auto}
 .nav-link{height:38px;padding:0 12px;border-radius:8px;font-size:12px}
 body.day .bar{color:#13202B;text-shadow:0 1px 3px rgba(255,255,255,.55)}
 .nav-link{font-size:14px;font-weight:600}
@@ -355,7 +354,6 @@ body.phone .w-corner{display:none}
 body.phone .w-head{cursor:default}
 body.phone .w-gear{opacity:1}
 body.phone .bar{position:absolute}
-@media (max-width:420px){.brand .logo{width:118px;height:30px}}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
