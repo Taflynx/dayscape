@@ -191,6 +191,41 @@ void main(){
   o = vec4(c, 1.);
 }`;
 
+// a painted plate: two images of the same view (say day and sunset) faded into each other, with the sky,
+// the river and the grass moved a little by time and wind. uBand: sky ends, water starts, water ends, grass starts (image v)
+const FS_PLATE = GLSL_COMMON + `
+uniform sampler2D uA, uB;
+uniform float uMix, uImgAspect, uT, uWind, uDir, uFade;
+uniform vec4 uBand;
+uniform vec3 uBg;
+out vec4 o;
+void main(){
+  vec2 p = vec2(gl_FragCoord.x, uRes.y * uScale - gl_FragCoord.y) / uScale;
+  // cover the screen, centred, a touch toward the bottom so the grass is never cut
+  float sa = uRes.x / uRes.y;
+  vec2 k = sa > uImgAspect ? vec2(1., uImgAspect / sa) : vec2(sa / uImgAspect, 1.);
+  vec2 uv = (p / uRes - .5) * k + vec2(.5, .5 + (1. - k.y) * .2);
+  float v = uv.y, t = uT;
+  // sky: the brush strokes breathe and drift very slowly
+  float skyM = smoothstep(uBand.x, uBand.x - .07, v);
+  uv += skyM * (vec2(vnoise(uv * vec2(5., 9.) + vec2(t * .05, 0.)), vnoise(uv * vec2(6., 8.) + 11. - vec2(0., t * .04))) - .5) * .006;
+  // water: ripples that run with the wind
+  float watM = smoothstep(uBand.y, uBand.y + .02, v) * smoothstep(uBand.z, uBand.z - .03, v);
+  float rip = sin(v * 420. - t * 1.6 + vnoise(uv * vec2(14., 60.)) * 6.) * .5 + (vnoise(vec2(uv.x * 40. - t * .35 * (.4 + uWind), v * 160.)) - .5);
+  uv += watM * vec2(rip * .0016 * (.6 + uWind), rip * .0007);
+  // grass: sways in gusts, more toward the tips at the bottom of the picture
+  float gr = clamp((v - uBand.w) / (1. - uBand.w), 0., 1.);
+  float gust = sin(t * 1.7 + uv.x * 9.) * .55 + sin(t * .61 + uv.x * 3.1) * .45;
+  uv.x += gr * (1. - gr * .55) * (uDir * uWind * (.35 + .45 * gust) + .08 * sin(t * 1.3 + uv.x * 23.)) * .012;
+  uv = clamp(uv, vec2(.001), vec2(.999));
+  vec3 c = mix(texture(uA, uv).rgb, texture(uB, uv).rgb, uMix);
+  // glints on the water
+  float glint = smoothstep(.78, .95, vnoise(vec2(uv.x * 260. + t * 1.2, v * 700.))) * watM;
+  c += glint * .12 * vec3(1., .96, .85) * dot(c, vec3(.33));
+  c = grade(mix(uBg, c, uFade), p.y) + (hash1(gl_FragCoord.xy) - .5) * .02;
+  o = vec4(c, 1.);
+}`;
+
 const GLSL_BEND = `
 uniform float uT, uWind, uDir;
 float bend(float x, float lean, float ph, float flex){
@@ -286,7 +321,7 @@ export function createEngine(cv){
   };
   let P;
   try{
-    P = {field: program(VS_FULL, FS_FIELD), fieldMask: program(VS_FULL, FS_FIELD_MASK), main: program(VS_FULL, FS_MAIN), blade: program(VS_BLADE, FS_BLADE), dab: program(VS_DAB, FS_DAB), fall: program(VS_FALL, FS_FALL)};
+    P = {field: program(VS_FULL, FS_FIELD), fieldMask: program(VS_FULL, FS_FIELD_MASK), main: program(VS_FULL, FS_MAIN), blade: program(VS_BLADE, FS_BLADE), dab: program(VS_DAB, FS_DAB), fall: program(VS_FALL, FS_FALL), plate: program(VS_FULL, FS_PLATE)};
   }catch(e){ console.warn('Dayscape: WebGL shaders failed, showing the plain sky.', e); return null; }
 
   const buf = (data, usage = gl.STATIC_DRAW) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, usage); return b; };
@@ -306,6 +341,31 @@ export function createEngine(cv){
   gl.bindVertexArray(fallVAO); attrib(0, lineVerts, 2, 2, 0, 0); attrib(1, fallBuf, 4, 4, 0, 1);
 
   let fieldTex = null, W = 0, H = 0, S = 1, cw = 0, ch = 0, scene = null, palette = null;
+  // painted plates: one texture per plate name, loaded when the scene is set; mix says which two show
+  let plates = {}, plateFor = null, plateFade = 0;
+  const mix = {a: 'day', b: 'day', t: 0};
+  function loadPlates(s){
+    for (const t of Object.values(plates)) gl.deleteTexture(t);
+    plates = {}; plateFade = 0; plateFor = s;
+    for (const [name, url] of Object.entries(s.plates || {})){
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => {
+        if (plateFor !== s) return;
+        const t = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        plates[name] = t;
+      };
+      img.onerror = () => console.warn('Dayscape: a scene painting failed to load', url);
+      img.src = url;
+    }
+  }
+  const plateTex = name => plates[name] || plates.day || Object.values(plates)[0];
   const fbo = gl.createFramebuffer();
 
   function upload(blades, dabs){
@@ -356,6 +416,7 @@ export function createEngine(cv){
   // bake the stroke field for the current size and scene (the mask path arrives with the city scenes)
   function bake(){
     if (!W) return;
+    if (scene?.kind === 'plates'){ upload([], []); palette = paletteUniforms(null); return; }
     if (fieldTex) gl.deleteTexture(fieldTex);
     fieldTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, fieldTex);
@@ -436,10 +497,28 @@ export function createEngine(cv){
     }
   }
 
-  function draw(){
-    if (!fieldTex) return;
+  function drawPlate(dt){
+    const A = plateTex(mix.a), B = plateTex(mix.b) || A;
+    if (A) plateFade = Math.min(1, plateFade + (dt ? dt / .8 : 1));
+    const pr = P.plate; common(pr);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, A || null); gl.uniform1i(pr.u('uA'), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, B || null); gl.uniform1i(pr.u('uB'), 1);
+    gl.activeTexture(gl.TEXTURE0);
+    const b = scene.bands || {};
+    gl.uniform4f(pr.u('uBand'), b.sky ?? .25, b.water?.[0] ?? 2, b.water?.[1] ?? 2, b.grass ?? 2);
+    gl.uniform1f(pr.u('uMix'), mix.t); gl.uniform1f(pr.u('uImgAspect'), scene.aspect || 16 / 9);
+    gl.uniform1f(pr.u('uT'), live.t); gl.uniform1f(pr.u('uWind'), live.wind); gl.uniform1f(pr.u('uDir'), live.dir);
+    gl.uniform1f(pr.u('uFade'), A ? plateFade : 0);
+    gl.uniform3fv(pr.u('uBg'), sky.s2.map(v => v / 255));
+    gl.bindVertexArray(empty); gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  function draw(dt){
+    const isPlate = scene?.kind === 'plates';
+    if (!fieldTex && !isPlate) return;
     gl.viewport(0, 0, cw, ch);
     gl.disable(gl.BLEND);
+    if (isPlate) drawPlate(dt); else {
     const m = P.main; common(m);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fieldTex); gl.uniform1i(m.u('uField'), 0);
     gl.uniform3fv(m.u('uS1'), sky.s1.map(v => v / 255)); gl.uniform3fv(m.u('uS2'), sky.s2.map(v => v / 255)); gl.uniform3fv(m.u('uS3'), sky.s3.map(v => v / 255));
@@ -449,6 +528,7 @@ export function createEngine(cv){
     gl.uniform1f(m.u('uKind'), palette.kind); gl.uniform1f(m.u('uWave'), live.wind);
     if (palette.kind){ gl.uniform3fv(m.u('uPDay'), palette.day); gl.uniform3fv(m.u('uPNight'), palette.night); gl.uniform1fv(m.u('uGlow'), palette.glow); }
     gl.bindVertexArray(empty); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
 
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     for (const [prog, vao, n, verts] of [[P.blade, bladeVAO, nBlades, 5], [P.dab, dabVAO, nDabs, 4]]){
@@ -468,9 +548,11 @@ export function createEngine(cv){
   return {
     sky, live, gl,
     get scene(){ return scene; },
-    setScene(s){ scene = s; bake(); },
+    setScene(s){ scene = s; if (s?.kind === 'plates') loadPlates(s); bake(); },
+    /** Which painted plates show: {a, b, t} from plateMix. */
+    setPlates(m){ Object.assign(mix, m); },
     resize,
     /** Advance by dt seconds (0 = still) and paint one frame. */
-    frame(dt){ step(dt, dt === 0); draw(); },
+    frame(dt){ step(dt, dt === 0); draw(dt); },
   };
 }
