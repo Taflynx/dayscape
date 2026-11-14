@@ -105,7 +105,7 @@ export function removeWidget(id){
 
 // ---------- the gear menu ----------
 let pop = null;
-export function closePop(){ pop?.remove(); pop = null; }
+export function closePop(){ pop?.remove(); pop = null; document.querySelectorAll('.widget.editing').forEach(e => e.classList.remove('editing')); }
 document.addEventListener('pointerdown', e => { if (pop && !pop.contains(e.target) && !e.target.closest('.w-gear')) closePop(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop(); });
 
@@ -143,6 +143,7 @@ export function openSettings(id){
     ${phone ? '<div class="pop-row"><button class="lnk" data-act="up">Move up</button><button class="lnk" data-act="down">Move down</button></div>' : ''}
     <button class="lnk danger" data-act="remove">Remove widget</button>`;
   document.body.append(pop);
+  m.el.classList.add('editing');   // the widget's name shows only while its settings are open
   const g = $('.w-gear', m.el).getBoundingClientRect(), pr = pop.getBoundingClientRect();
   pop.style.left = Math.max(8, Math.min(innerWidth - pr.width - 8, g.right - pr.width)) + 'px';
   pop.style.top = Math.max(8, Math.min(innerHeight - pr.height - 8, g.bottom + 6)) + 'px';

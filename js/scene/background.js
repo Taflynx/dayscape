@@ -3,7 +3,6 @@ import { $, esc } from '../util.js';
 import { localParts, fmtTime } from '../time.js';
 import { paintSky, rgb, lum } from './sky.js';
 import { pickScene } from './pick.js';
-import { plateMix, sunHours } from './plates.js';
 import meadow from './scenes/meadow.js';
 import montreal from './scenes/montreal.js';
 import { applyWeather, fmtTemp } from '../weather.js';
@@ -18,7 +17,7 @@ export const sceneHome = (scene, ctx) => scene.place || ctx.places.home();
 
 export function startBackground(ctx, engine){
   const st = () => ctx.state;
-  let scene = null, sun = {rise: NaN, set: NaN}, sunFor = null, captionKey = '', menu = null, fc = null, fcFor = '', wxKey = '';
+  let scene = null, captionKey = '', menu = null, fc = null, fcFor = '', wxKey = '';
 
   // the forecast for whatever place the scene shows; refreshed by the caller every 15 minutes
   async function loadForecast(){
@@ -32,7 +31,7 @@ export function startBackground(ctx, engine){
   const conditions = T => fc ? (ctx.clock.isLive() ? ctx.weather.current(fc) : ctx.weather.at(fc, T)) : null;
 
   function show(s){
-    scene = s; sunFor = null;
+    scene = s;
     st().bg = {...st().bg, last: s.id};
     ctx.save();
     engine?.setScene(s);
@@ -61,11 +60,6 @@ export function startBackground(ctx, engine){
     const sky = engine ? engine.sky : {};
     const veil = engine ? Math.min(.85, Math.max(0, (engine.live.coverT - .6) / .35)) : 0;
     paintSky(sky, hourFrac(T), veil);
-    if (engine && scene.kind === 'plates'){
-      const day = Math.floor(T / 36e5);   // sunrise and sunset change slowly: work them out once an hour
-      if (sunFor !== day){ sunFor = day; sun = sunHours(T, home); }
-      engine.setPlates(plateMix(hourFrac(T), sun.rise, sun.set));
-    }
     const root = document.documentElement.style;
     root.setProperty('--s1', rgb(sky.s1)); root.setProperty('--s2', rgb(sky.s2)); root.setProperty('--s3', rgb(sky.s3));
     document.body.classList.toggle('day', lum(sky.s2) > 0.62);

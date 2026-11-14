@@ -60,8 +60,9 @@ body.day .bar{color:#13202B;text-shadow:0 1px 3px rgba(255,255,255,.55)}
 .widget.fresh{animation:fresh .9s ease-out}
 @keyframes fresh{0%{outline:3px solid var(--vermilion)}100%{outline:3px solid transparent}}
 .w-head{flex:none;display:flex;align-items:center;height:32px;padding:0 8px 0 16px;cursor:grab;touch-action:none;user-select:none}
+.widget.editing .w-name{opacity:1}
 .moving .w-head{cursor:grabbing}
-.w-name{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:auto}
+.w-name{opacity:0;transition:opacity .15s;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:auto}
 .w-gear{width:26px;height:26px;display:grid;place-items:center;border-radius:6px;color:var(--muted);opacity:0;transition:opacity .15s}
 .w-gear svg{width:15px;height:15px}
 .widget:hover .w-gear,.w-gear:focus-visible{opacity:1}

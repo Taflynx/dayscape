@@ -37,7 +37,7 @@ Widgets come in clear glass by day and smoked glass at night. You can also fix t
 
 ## How it works
 
-Plain HTML, CSS and JavaScript modules, with no build step and no server. The background is drawn with WebGL2. The meadow is painted live in brush strokes. Each city is four impasto oil paintings of one view, for morning, day, sunset and night, that fade into each other with the real sunrise and sunset. The sky, the river and the grass keep moving in the wind, and rain and snow fall over everything. Your board, places and notes live in your browser's local storage. Settings → Backup saves them to a file you can restore elsewhere.
+Plain HTML, CSS and JavaScript modules, with no build step and no server. The background is drawn with WebGL2. The meadow is painted live in brush strokes. Each city is an oil painting of one view, by day and by night, with its sky cut out: a live painted sky with drifting clouds, the sun, the moon and stars shows behind it, the city takes the light of the hour, the river mirrors the sky and the grass moves in the wind. Rain and snow fall over everything. Your board, places and notes live in your browser's local storage. Settings → Backup saves them to a file you can restore elsewhere.
 
 ## Run it locally
 
