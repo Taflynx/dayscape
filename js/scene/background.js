@@ -1,7 +1,8 @@
 // The living background: picks this visit's scene, paints it at the displayed time, and shows the caption.
 import { $, esc } from '../util.js';
 import { localParts, fmtTime } from '../time.js';
-import { paintSky, rgb, lum } from './sky.js';
+import { paintSky, skyHour, rgb, lum } from './sky.js';
+import { sunTimes } from '../astro.js';
 import { pickScene } from './pick.js';
 import meadow from './scenes/meadow.js';
 import montreal from './scenes/montreal.js';
@@ -46,6 +47,20 @@ export function startBackground(ctx, engine){
     return pickScene(SCENES, bg, st().places.map(p => p.name));
   }
 
+  // that day's sunrise and sunset at the scene's place, in local hours; worked out once per local day
+  let sunKey = '', sun = [NaN, NaN];
+  function sunOf(T, home){
+    if (!Number.isFinite(home.lat) || !Number.isFinite(home.lon)) return [NaN, NaN];
+    const p = localParts(home.tz, T), k = [home.lat, home.lon, p.y, p.mo, p.d].join();
+    if (k !== sunKey){
+      sunKey = k;
+      const st = sunTimes(Date.UTC(p.y, p.mo - 1, p.d), home.lat, home.lon);
+      const hrs = ms => { if (ms == null) return NaN; const q = localParts(home.tz, ms); return q.h + q.mi / 60 + q.s / 3600; };
+      sun = [hrs(st.sunrise), hrs(st.sunset)];
+    }
+    return sun;
+  }
+
   function hourFrac(T){
     const p = localParts(sceneHome(scene, ctx).tz, T);
     return p.h + p.mi / 60 + p.s / 3600;
@@ -59,7 +74,7 @@ export function startBackground(ctx, engine){
     if (engine && k !== wxKey){ wxKey = k; applyWeather(engine.live, w); }
     const sky = engine ? engine.sky : {};
     const veil = engine ? Math.min(.85, Math.max(0, (engine.live.coverT - .6) / .35)) : 0;
-    paintSky(sky, hourFrac(T), veil);
+    paintSky(sky, skyHour(hourFrac(T), ...sunOf(T, home)), veil);
     const root = document.documentElement.style;
     root.setProperty('--s1', rgb(sky.s1)); root.setProperty('--s2', rgb(sky.s2)); root.setProperty('--s3', rgb(sky.s3));
     document.body.classList.toggle('day', lum(sky.s2) > 0.62);

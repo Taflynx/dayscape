@@ -44,3 +44,15 @@ export function paintSky(sky, hf, sunVeil = 0){
   sky.day = Math.max(0, Math.min(1, (lum(m) - 0.25) / 0.45));
   return sky;
 }
+
+/**
+ * The painted sky runs on a fixed day, sunrise at 6:00 and sunset at 19:00. Map a real local hour `h`
+ * onto it, given that day's real sunrise and sunset (local hours), so dawn and dusk land when they really happen.
+ */
+export function skyHour(h, rise, set){
+  if (!Number.isFinite(rise) || !Number.isFinite(set) || set <= rise) return h;
+  h = ((h % 24) + 24) % 24;
+  if (h >= rise && h <= set) return 6 + (h - rise) / (set - rise) * 13;
+  const night = 24 - (set - rise), since = ((h - set) % 24 + 24) % 24;
+  return (19 + since / night * 11) % 24;
+}
