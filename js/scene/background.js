@@ -6,10 +6,11 @@ import { sunTimes } from '../astro.js';
 import { pickScene } from './pick.js';
 import meadow from './scenes/meadow.js';
 import montreal from './scenes/montreal.js';
+import telaviv from './scenes/telaviv.js';
 import { applyWeather, fmtTemp } from '../weather.js';
 
 export { pickScene };
-export const SCENES = [meadow, montreal];
+export const SCENES = [meadow, montreal, telaviv];
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
