@@ -11,5 +11,6 @@ export default {
   plates: {day: plate('day'), night: plate('night')},
   aspect: 16 / 9,
   // in image height from the top: where the river runs and where the grass starts
-  bands: {water: [.51, .79], grass: .73},
+  bands: {water: [.52, .79], grass: .73},
+  horizon: .34,   // the sun and moon rise and set behind the mountain
 };

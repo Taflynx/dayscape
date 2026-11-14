@@ -106,7 +106,7 @@ uniform float uKind, uWave;
 uniform vec3 uPDay[13], uPNight[13];
 uniform float uGlow[13];
 uniform sampler2D uPlA, uPlB;            // painted plates: day and night, the sky cut out in alpha
-uniform float uImgAspect, uWarm, uPlFade;
+uniform float uImgAspect, uWarm, uPlFade, uSkyY;
 uniform vec4 uBand;                      // image v: sky ends, water starts, water ends, grass starts
 out vec4 o;
 vec3 overlay(vec3 b, float a){ return mix(2. * a * b, 1. - 2. * (1. - a) * (1. - b), step(.5, b)); }
@@ -150,12 +150,10 @@ vec4 flowStroke(vec2 p, float cell, float seed){
     vec4 h = hash4(c + seed * 31.7);
     vec2 ctr = c + h.xy;
     vec2 dir = flow(ctr * cell);
-    // each stroke glides along its own direction, then thins away while a new one is laid in
-    float life = fract(uT * (.035 + h.y * .03) + h.z * 7.);
-    vec2 d = q - ctr - dir * (life - .5) * .8;
+    vec2 d = q - ctr;
     d = vec2(dot(d, dir), dot(d, vec2(-dir.y, dir.x)));
     float len = 1.05 + h.w * .8, u = d.x / len;
-    float w = (.25 + h.z * .14) * (1. - u * u * .55) * smoothstep(0., .14, sin(3.14159 * life));
+    float w = (.25 + h.z * .14) * (1. - u * u * .55);
     if (abs(u) < 1. && abs(d.y) < w){
       float pr = fract(h.x * 7.13 + h.y * 3.71 + h.w * 1.37);
       if (pr > best){
@@ -167,19 +165,29 @@ vec4 flowStroke(vec2 p, float cell, float seed){
   }
   return res;
 }
+vec3 paintAt(vec2 sp, vec3 g, float fr, float seed){
+  vec4 k = flowStroke(sp, 14., seed);
+  // between the strokes the darker ground shows, as on a real canvas
+  vec3 c = k.w > 0. ? overlay(g, clamp(.5 + (k.x - .5) * .8 + (fr - .5) * .12, 0., 1.)) * (1. - .14 * abs(k.y))
+                    : g * mix(.74, .84, fr);
+  float on = step(0., k.w);
+  c = mix(c, c * vec3(1.1, 1.05, .82) + vec3(.07, .06, 0.), smoothstep(.75, .92, k.z) * .6 * (1. - uNight * .3) * on);
+  return mix(c, c * vec3(.8, .87, 1.1), smoothstep(.25, .08, k.z) * .5 * on);
+}
 vec3 skyCol(vec2 p, float y, float fr){
+  y *= uSkyY;
   vec3 g = y < .42 ? mix(uS1, uS2, y / .42) : mix(uS2, uS3, clamp((y - .42) / .28, 0., 1.));
   float gl0 = dot(g, vec3(.2126, .7152, .0722));
   g = clamp(mix(vec3(gl0), g, 1.45) * vec3(.94, .98, 1.08), 0., 1.);   // Van Gogh's skies are deeper and bluer than life
-  vec2 sp = p;
-  vec4 a = flowStroke(sp, 15., 1.), b = flowStroke(sp + 7., 9., 2.);
-  vec4 k = b.w > 0. && b.z > .45 ? b : a;           // small strokes lie over the big ones here and there
-  // between the strokes the darker ground shows, as on a real canvas
-  vec3 c = k.w > 0. ? overlay(g, clamp(.5 + (k.x - .5) * .8 + (fr - .5) * .12, 0., 1.)) * (1. - .14 * abs(k.y))
-                    : g * mix(.72, .82, fr);
-  float pick = k.z;
-  c = mix(c, c * vec3(1.1, 1.05, .82) + vec3(.07, .06, 0.), smoothstep(.75, .92, pick) * .6 * (1. - uNight * .3) * step(0., k.w));
-  c = mix(c, c * vec3(.8, .87, 1.1), smoothstep(.25, .08, pick) * .5 * step(0., k.w));
+  // the paint flows: two copies of the strokes slide along the local brush direction, each fading out
+  // as it is reset while the other is at its fullest, so the motion never jumps. Each patch of sky
+  // runs on its own phase, so the sky never pulses as one.
+  vec2 fd = flow(p);
+  float ph = uT / 9. + vnoise(p / 260.) * 2.;
+  float p0 = fract(ph), p1 = fract(ph + .5), w0 = 1. - abs(2. * p0 - 1.);
+  vec3 c0 = paintAt(p - fd * p0 * 46., g, fr, 1.), c1 = paintAt(p - fd * p1 * 46. + vec2(53., 29.), g, fr, 3.);
+  vec3 c = mix(c1, c0, smoothstep(.3, .7, w0));   // mostly one layer at a time, so the strokes stay crisp
+  float kt = clamp(.5 + dot(c - g, vec3(1.)) * 1.2, 0., 1.);   // how light the paint is here, for clouds and halos
   vec2 sc = floor(p / 38.); vec4 sth = hash4(sc + 5.1);
   float sd = length(p - (sc + .15 + sth.xy * .7) * 38.);
   float star = step(.72, sth.z) * smoothstep(1.5 + sth.w, .2, sd) * (.65 + .35 * sin(uT * 2. + sth.w * 30.));
@@ -200,7 +208,7 @@ vec3 skyCol(vec2 p, float y, float fr){
       float d1 = fbm((cp - vec2(0., 16.)) / vec2(340., 110.));
       float shade = clamp((d0 - d1) * 4.5 + .62, 0., 1.);
       vec3 light = mix(uS2 * 1.2 + .1, vec3(.98, .97, .95), uDay * .8), dark = mix(uS1 * 1.1, vec3(.62, .64, .7), uDay * .7);
-      c = mix(c, mix(dark, light, shade) * (.86 + k.x * .22 - .08 * abs(k.y)), a * .85);   // clouds are painted with the same strokes
+      c = mix(c, mix(dark, light, shade) * (.84 + kt * .26), a * .85);   // clouds are painted with the same strokes
       star *= 1. - a;
     }
   }
@@ -209,7 +217,7 @@ vec3 skyCol(vec2 p, float y, float fr){
     vec3 o = i == 0 ? uSun : uMoon;
     if (o.z <= 0.) continue;
     float d = length(p - o.xy * uRes), R = clamp(uRes.x * .035, 34., 54.);
-    float ring = exp(-d / (R * 2.6)) * (.55 + .45 * sin(d * .16 - uT * 1.1 + k.x * 1.5)) * smoothstep(R * .95, R * 1.3, d);
+    float ring = exp(-d / (R * 2.6)) * (.55 + .45 * sin(d * .16 - uT * 1.1 + kt * 1.5)) * smoothstep(R * .95, R * 1.3, d);
     c += ring * o.z * (i == 0 ? vec3(1., .82, .35) * .5 : vec3(.95, .92, .7) * .38);
   }
   return c;
@@ -587,6 +595,7 @@ export function createEngine(cv){
     gl.uniform3fv(m.u('uSun'), sky.sun); gl.uniform3fv(m.u('uMoon'), sky.moon);
     gl.uniform1f(m.u('uNight'), sky.night); gl.uniform1f(m.u('uDay'), sky.day);
     gl.uniform1f(m.u('uCover'), live.cover); gl.uniform1f(m.u('uDrift'), live.drift); gl.uniform1f(m.u('uT'), live.rt);
+    gl.uniform1f(m.u('uSkyY'), scene?.horizon ? .66 / scene.horizon : 1);
     gl.uniform1f(m.u('uKind'), palette.kind); gl.uniform1f(m.u('uWave'), live.wind);
     if (palette.kind === 2){
       const A = plateTex('day'), B = plateTex('night') || A;

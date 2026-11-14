@@ -30,12 +30,12 @@ export function newSky(){
   return {s1: [28, 33, 64], s2: [46, 47, 90], s3: [74, 63, 107], sun: [0, 0, 0], moon: [0, 0, 0], light: .36, sat: .7, night: 1, day: 0};
 }
 
-/** Writes the colours, orbs and light for `hourFrac` (local hours, 0..24) into `sky`. */
-export function paintSky(sky, hf, sunVeil = 0){
+/** Writes the colours, orbs and light for `hourFrac` (local hours, 0..24) into `sky`. `horizon`: where the orbs rise and set, as a fraction of the height. */
+export function paintSky(sky, hf, sunVeil = 0, horizon = .76){
   const [t, m, h] = skyAt(hf);
   sky.s1 = t; sky.s2 = m; sky.s3 = h;
-  // sun travels 6:00 -> 19:00, moon 19:00 -> 6:00, along an arc that dips behind the hills
-  const arc = p => [(8 + p * 84) / 100, (76 - Math.sin(Math.PI * Math.min(1, Math.max(0, p))) * 62) / 100, p >= -0.04 && p <= 1.04 ? 1 - sunVeil : 0];
+  // sun travels 6:00 -> 19:00, moon 19:00 -> 6:00, along an arc from the horizon (the hills, or a city's skyline) up to 14% from the top
+  const arc = p => [(8 + p * 84) / 100, horizon - Math.sin(Math.PI * Math.min(1, Math.max(0, p))) * (horizon - .14), p >= -0.04 && p <= 1.04 ? 1 - sunVeil : 0];
   sky.sun = arc((hf - 6) / 13);
   sky.moon = arc((((hf - 19) % 24) + 24) % 24 / 11);
   sky.light = (hf > 5 && hf < 20) ? Math.max(0.36, Math.min(1, 1.25 * Math.sin(Math.PI * (hf - 5) / 15))) : 0.36;

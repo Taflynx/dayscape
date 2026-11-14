@@ -11,4 +11,5 @@ export default {
   aspect: 16 / 9,
   // in image height from the top: the sea runs from below the beach to the bottom edge; no grass
   bands: {water: [.62, 1.02]},
+  horizon: .4,   // the sun and moon rise and set behind the skyline
 };

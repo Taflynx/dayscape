@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { skyHour } from '../js/scene/sky.js';
+import { skyHour, paintSky, newSky } from '../js/scene/sky.js';
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
 
@@ -19,4 +19,22 @@ test('spreads the night evenly between sunset and the next sunrise', () => {
 test('falls back to the clock hour without sun times', () => {
   near(skyHour(14.25, NaN, NaN), 14.25);
   near(skyHour(14.25, null, 18), 14.25);
+});
+
+test('the sun rises from the given horizon and stays above it through the day', () => {
+  const sky = newSky();
+  paintSky(sky, 6, 0, .36);
+  near(sky.sun[1], .36);
+  for (const h of [8, 10, 12.5, 15, 18]){
+    paintSky(sky, h, 0, .36);
+    assert.ok(sky.sun[1] < .36 && sky.sun[1] >= .12, `${h}: ${sky.sun[1]}`);
+  }
+  paintSky(sky, 12.5, 0, .36);
+  near(sky.sun[1], .14);
+});
+
+test('without a horizon the arc dips behind the meadow hills as before', () => {
+  const sky = newSky();
+  paintSky(sky, 6);
+  near(sky.sun[1], .76);
 });

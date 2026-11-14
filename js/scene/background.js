@@ -75,7 +75,7 @@ export function startBackground(ctx, engine){
     if (engine && k !== wxKey){ wxKey = k; applyWeather(engine.live, w); }
     const sky = engine ? engine.sky : {};
     const veil = engine ? Math.min(.85, Math.max(0, (engine.live.coverT - .6) / .35)) : 0;
-    paintSky(sky, skyHour(hourFrac(T), ...sunOf(T, home)), veil);
+    paintSky(sky, skyHour(hourFrac(T), ...sunOf(T, home)), veil, scene.horizon ?? .76);
     const root = document.documentElement.style;
     root.setProperty('--s1', rgb(sky.s1)); root.setProperty('--s2', rgb(sky.s2)); root.setProperty('--s3', rgb(sky.s3));
     document.body.classList.toggle('day', lum(sky.s2) > 0.62);
