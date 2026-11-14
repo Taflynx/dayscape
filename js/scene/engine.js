@@ -128,14 +128,15 @@ vec3 orb(vec3 c, vec3 o, float R, vec2 p, float fr, vec3 a, vec3 b, vec3 e, vec3
 // and curls into a few slow whirlpools drifting with the wind
 vec2 vortex(int i){
   vec4 h = hash4(vec2(float(i) * 7.1, 3.3));
-  return vec2(mod(h.x * uRes.x * 1.3 + uDrift * (.25 + h.y * .2), uRes.x * 1.3) - uRes.x * .15, uRes.y * (.1 + h.z * .2));
+  // the whirlpools stay where they are and only breathe; the motion is in the strokes that flow around them
+  return vec2(h.x * uRes.x * 1.1 - uRes.x * .05, uRes.y * (.1 + h.z * .2)) + vec2(sin(uT * .05 + h.y * 6.), cos(uT * .04 + h.w * 6.)) * uRes.y * .015;
 }
 vec2 flow(vec2 q){
   vec2 v = vec2(1., .28 * sin(q.x / 170. + uT * .17) + .1 * sin(q.x / 61. - uT * .23));
   for (int i = 0; i < 3; i++){
     vec4 h = hash4(vec2(float(i) * 7.1, 3.3));
     vec2 d = q - vortex(i);
-    float R = uRes.y * (.07 + h.w * .06), w = exp(-dot(d, d) / (R * R * 2.2)) * 3.2 * (i == 1 ? -1. : 1.);
+    float R = uRes.y * (.07 + h.w * .06), w = exp(-dot(d, d) / (R * R * 2.2)) * (2.9 + .5 * sin(uT * .11 + float(i) * 2.)) * (i == 1 ? -1. : 1.);
     v += vec2(-d.y, d.x) / R * w;
   }
   return normalize(v);
@@ -148,10 +149,13 @@ vec4 flowStroke(vec2 p, float cell, float seed){
     vec2 c = i + vec2(float(xx), float(yy));
     vec4 h = hash4(c + seed * 31.7);
     vec2 ctr = c + h.xy;
-    vec2 dir = flow(ctr * cell), d = q - ctr;
+    vec2 dir = flow(ctr * cell);
+    // each stroke glides along its own direction, then thins away while a new one is laid in
+    float life = fract(uT * (.035 + h.y * .03) + h.z * 7.);
+    vec2 d = q - ctr - dir * (life - .5) * .8;
     d = vec2(dot(d, dir), dot(d, vec2(-dir.y, dir.x)));
-    float len = 1.1 + h.w * .9, u = d.x / len;
-    float w = (.24 + h.z * .14) * (1. - u * u * .55);
+    float len = 1.05 + h.w * .8, u = d.x / len;
+    float w = (.25 + h.z * .14) * (1. - u * u * .55) * smoothstep(0., .14, sin(3.14159 * life));
     if (abs(u) < 1. && abs(d.y) < w){
       float pr = fract(h.x * 7.13 + h.y * 3.71 + h.w * 1.37);
       if (pr > best){
@@ -167,7 +171,7 @@ vec3 skyCol(vec2 p, float y, float fr){
   vec3 g = y < .42 ? mix(uS1, uS2, y / .42) : mix(uS2, uS3, clamp((y - .42) / .28, 0., 1.));
   float gl0 = dot(g, vec3(.2126, .7152, .0722));
   g = clamp(mix(vec3(gl0), g, 1.45) * vec3(.94, .98, 1.08), 0., 1.);   // Van Gogh's skies are deeper and bluer than life
-  vec2 sp = p - vec2(uT * 5., 0.);
+  vec2 sp = p;
   vec4 a = flowStroke(sp, 15., 1.), b = flowStroke(sp + 7., 9., 2.);
   vec4 k = b.w > 0. && b.z > .45 ? b : a;           // small strokes lie over the big ones here and there
   // between the strokes the darker ground shows, as on a real canvas
@@ -184,11 +188,11 @@ vec3 skyCol(vec2 p, float y, float fr){
   float bd = length(p - (bc + .2 + bh.xy * .6) * 150.), bs = step(.62, bh.z) * (.7 + .3 * sin(uT * .9 + bh.w * 20.));
   star += bs * (smoothstep(7., 2., bd) + .45 * exp(-bd / 16.) * (.6 + .4 * sin(bd * .55 - uT * 1.5)));
   float R = clamp(uRes.x * .035, 34., 54.);
-  c = orb(c, uSun, R, p, fr, vec3(1., .84, .47), vec3(.97, .63, .27), vec3(.89, .41, .2), vec3(1., .74, .43) * .5);
+  c = orb(c, uSun, R, p, fr, vec3(1., .97, .7), vec3(1., .86, .32), vec3(.97, .68, .16), vec3(1., .86, .45) * .55);   // chrome yellow, as he painted it
   c = orb(c, uMoon, R * .9, p, fr, vec3(1., .99, .93), vec3(.93, .9, .81), vec3(.78, .76, .67), vec3(1., .98, .88) * .16);
   float mask = smoothstep(uRes.y * .64, uRes.y * .4, p.y);
   if (mask > 0.){
-    vec2 cp = p - vec2(uDrift, 0.);
+    vec2 cp = p - vec2(uDrift * .3, 0.);   // clouds only creep; the strokes carry the motion
     float thr = mix(.64, .3, uCover), d0 = fbm(cp / vec2(340., 110.));
     if (d0 > thr - .1){
       vec3 s = stroke(cp, vec2(46., 12.), 9.);

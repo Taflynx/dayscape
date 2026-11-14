@@ -23,6 +23,7 @@ Drag a widget by its header to move it. Drag its bottom-right corner to resize i
 - **Sun and moon**: sunrise, sunset and the moon's phase
 - **Meeting planner**: the best times today when all your places are at work
 - **Timer**: a countdown or a Pomodoro
+- **Focus music**: calm live radio from YouTube (lofi, café jazz, piano, chill beats) with play, pause, previous and next
 - **Currency** converter on European Central Bank rates
 - **Notes**: sticky notes that float above the board. Use + on a note to add another.
 - **To-do** list
