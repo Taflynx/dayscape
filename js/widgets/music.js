@@ -1,11 +1,12 @@
 // Calm focus music: live radio stations from YouTube, with play, pause, previous and next.
-// Each station is a channel's current live stream, so a station keeps working when the channel starts a new stream.
+// Each station embeds a specific 24/7 live video: YouTube no longer plays embeds that only name a channel.
+// If a video goes away (the channel restarted its stream), the player reports an error and the widget moves on.
 
 export const STATIONS = [
-  {name: 'Lofi beats', by: 'Lofi Girl', channel: 'UCSJ4gkVC6NrvII8umztf0Ow'},
-  {name: 'Café jazz', by: 'Cafe Music BGM', channel: 'UCJhjE7wbdYAae1G25m0tHAA'},
-  {name: 'Calm piano', by: 'Soothing Relaxation', channel: 'UCjzHeG1KWoonmf9d5KBvSiw'},
-  {name: 'Chill beats', by: 'Essentials Radio', channel: 'UCOxqgCwgOqC2lMqC5PYz_Dg'},
+  {name: 'Lofi beats', by: 'Lofi Girl', channel: 'UCSJ4gkVC6NrvII8umztf0Ow', video: '4t4AQ15yj1M'},
+  {name: 'Café jazz', by: 'Cafe Music BGM', channel: 'UCJhjE7wbdYAae1G25m0tHAA', video: 'Ij5zelA8w-Y'},
+  {name: 'Calm piano', by: 'Soothing Relaxation', channel: 'UCjzHeG1KWoonmf9d5KBvSiw', video: 'w9S5ID3nfOc'},
+  {name: 'Chill beats', by: 'Essentials Radio', channel: 'UCOxqgCwgOqC2lMqC5PYz_Dg', video: 'jiua2V9q9V0'},
 ];
 
 /** The station `d` steps from `i`, wrapping around. */
@@ -15,8 +16,7 @@ export function stepStation(i, d, n = STATIONS.length){
 }
 
 export function embedUrl(st, autoplay){
-  const u = new URL('https://www.youtube-nocookie.com/embed/live_stream');
-  u.searchParams.set('channel', st.channel);
+  const u = new URL(`https://www.youtube-nocookie.com/embed/${st.video}`);
   u.searchParams.set('autoplay', autoplay ? '1' : '0');
   u.searchParams.set('enablejsapi', '1');
   u.searchParams.set('controls', '0');
@@ -24,6 +24,14 @@ export function embedUrl(st, autoplay){
   u.searchParams.set('playsinline', '1');
   if (typeof location !== 'undefined' && location.origin?.startsWith('http')) u.searchParams.set('origin', location.origin);
   return u.href;
+}
+
+/** The error code in a message from the YouTube player, or null when the message is not an error. */
+export function playerError(data){
+  try {
+    const m = typeof data === 'string' ? JSON.parse(data) : data;
+    return m?.event === 'onError' ? m.info : null;
+  } catch { return null; }
 }
 
 const ICON = {
@@ -69,8 +77,18 @@ export default {
       frame.allow = 'autoplay; encrypted-media';
       frame.referrerPolicy = 'strict-origin-when-cross-origin';
       frame.src = embedUrl(STATIONS[idx()], true);
+      // ask the player to report its events (errors included) back to this page
+      frame.addEventListener('load', () => frame?.contentWindow?.postMessage(JSON.stringify({event: 'listening', id: 1}), '*'));
       screen.append(frame);
     }
+    let skipped = 0;
+    function onMessage(e){
+      if (!frame || e.source !== frame.contentWindow) return;
+      if (playerError(e.data) == null) { if (String(e.data).includes('"playerState":1')) skipped = 0; return; }
+      if (++skipped < STATIONS.length) go(1);
+      else { pause(); el.querySelector('.mu-by').textContent = 'Stations unavailable right now'; }
+    }
+    window.addEventListener('message', onMessage);
     function play(){ if (!frame) load(); else command('playVideo'); playing = true; label(); }
     function pause(){ command('pauseVideo'); playing = false; label(); }
     function go(d){
@@ -86,6 +104,6 @@ export default {
       else if (act === 'next') go(1);
     });
     label();
-    return {update(){}, resize(){}, destroy(){ frame?.remove(); }};
+    return {update(){}, resize(){}, destroy(){ window.removeEventListener('message', onMessage); frame?.remove(); }};
   },
 };
