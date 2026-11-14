@@ -124,11 +124,65 @@ vec3 orb(vec3 c, vec3 o, float R, vec2 p, float fr, vec3 a, vec3 b, vec3 e, vec3
   }
   return c;
 }
+// Van Gogh's sky: short separate dashes of paint, each laid along a flow that runs in long rivers
+// and curls into a few slow whirlpools drifting with the wind
+vec2 vortex(int i){
+  vec4 h = hash4(vec2(float(i) * 7.1, 3.3));
+  return vec2(mod(h.x * uRes.x * 1.3 + uDrift * (.25 + h.y * .2), uRes.x * 1.3) - uRes.x * .15, uRes.y * (.1 + h.z * .2));
+}
+vec2 flow(vec2 q){
+  vec2 v = vec2(1., .28 * sin(q.x / 170. + uT * .17) + .1 * sin(q.x / 61. - uT * .23));
+  for (int i = 0; i < 3; i++){
+    vec4 h = hash4(vec2(float(i) * 7.1, 3.3));
+    vec2 d = q - vortex(i);
+    float R = uRes.y * (.07 + h.w * .06), w = exp(-dot(d, d) / (R * R * 2.2)) * 3.2 * (i == 1 ? -1. : 1.);
+    v += vec2(-d.y, d.x) / R * w;
+  }
+  return normalize(v);
+}
+// x = shade (with bristles), y = across the stroke, z = a random per stroke; best = -1 where no stroke covers
+vec4 flowStroke(vec2 p, float cell, float seed){
+  vec2 q = p / cell, i = floor(q);
+  float best = -1.; vec4 res = vec4(.5, 0., .5, -1.);
+  for (int yy = -2; yy <= 2; yy++) for (int xx = -2; xx <= 2; xx++){
+    vec2 c = i + vec2(float(xx), float(yy));
+    vec4 h = hash4(c + seed * 31.7);
+    vec2 ctr = c + h.xy;
+    vec2 dir = flow(ctr * cell), d = q - ctr;
+    d = vec2(dot(d, dir), dot(d, vec2(-dir.y, dir.x)));
+    float len = 1.1 + h.w * .9, u = d.x / len;
+    float w = (.24 + h.z * .14) * (1. - u * u * .55);
+    if (abs(u) < 1. && abs(d.y) < w){
+      float pr = fract(h.x * 7.13 + h.y * 3.71 + h.w * 1.37);
+      if (pr > best){
+        best = pr;
+        float br = vnoise(vec2(u * 1.2 + h.x * 13., d.y / w * 4. + h.y * 29.));
+        res = vec4(clamp(fract(h.w * 31.7 + h.y * 3.1) * .8 + br * .3 - .05, 0., 1.), d.y / w, fract(h.z * 17.3), 1.);
+      }
+    }
+  }
+  return res;
+}
 vec3 skyCol(vec2 p, float y, float fr){
   vec3 g = y < .42 ? mix(uS1, uS2, y / .42) : mix(uS2, uS3, clamp((y - .42) / .28, 0., 1.));
-  vec3 c = overlay(g, fr);
-  vec2 sc = floor(p / 38.); vec4 sh = hash4(sc + 5.1);
-  float star = step(.72, sh.z) * smoothstep(1.5 + sh.w, .2, length(p - (sc + .15 + sh.xy * .7) * 38.)) * (.65 + .35 * sin(uT * 2. + sh.w * 30.));
+  float gl0 = dot(g, vec3(.2126, .7152, .0722));
+  g = clamp(mix(vec3(gl0), g, 1.45) * vec3(.94, .98, 1.08), 0., 1.);   // Van Gogh's skies are deeper and bluer than life
+  vec2 sp = p - vec2(uT * 5., 0.);
+  vec4 a = flowStroke(sp, 15., 1.), b = flowStroke(sp + 7., 9., 2.);
+  vec4 k = b.w > 0. && b.z > .45 ? b : a;           // small strokes lie over the big ones here and there
+  // between the strokes the darker ground shows, as on a real canvas
+  vec3 c = k.w > 0. ? overlay(g, clamp(.5 + (k.x - .5) * .8 + (fr - .5) * .12, 0., 1.)) * (1. - .14 * abs(k.y))
+                    : g * mix(.72, .82, fr);
+  float pick = k.z;
+  c = mix(c, c * vec3(1.1, 1.05, .82) + vec3(.07, .06, 0.), smoothstep(.75, .92, pick) * .6 * (1. - uNight * .3) * step(0., k.w));
+  c = mix(c, c * vec3(.8, .87, 1.1), smoothstep(.25, .08, pick) * .5 * step(0., k.w));
+  vec2 sc = floor(p / 38.); vec4 sth = hash4(sc + 5.1);
+  float sd = length(p - (sc + .15 + sth.xy * .7) * 38.);
+  float star = step(.72, sth.z) * smoothstep(1.5 + sth.w, .2, sd) * (.65 + .35 * sin(uT * 2. + sth.w * 30.));
+  // a few big stars with Van Gogh's glowing rings
+  vec2 bc = floor(p / 150.); vec4 bh = hash4(bc + 9.7);
+  float bd = length(p - (bc + .2 + bh.xy * .6) * 150.), bs = step(.62, bh.z) * (.7 + .3 * sin(uT * .9 + bh.w * 20.));
+  star += bs * (smoothstep(7., 2., bd) + .45 * exp(-bd / 16.) * (.6 + .4 * sin(bd * .55 - uT * 1.5)));
   float R = clamp(uRes.x * .035, 34., 54.);
   c = orb(c, uSun, R, p, fr, vec3(1., .84, .47), vec3(.97, .63, .27), vec3(.89, .41, .2), vec3(1., .74, .43) * .5);
   c = orb(c, uMoon, R * .9, p, fr, vec3(1., .99, .93), vec3(.93, .9, .81), vec3(.78, .76, .67), vec3(1., .98, .88) * .16);
@@ -142,11 +196,18 @@ vec3 skyCol(vec2 p, float y, float fr){
       float d1 = fbm((cp - vec2(0., 16.)) / vec2(340., 110.));
       float shade = clamp((d0 - d1) * 4.5 + .62, 0., 1.);
       vec3 light = mix(uS2 * 1.2 + .1, vec3(.98, .97, .95), uDay * .8), dark = mix(uS1 * 1.1, vec3(.62, .64, .7), uDay * .7);
-      c = mix(c, mix(dark, light, shade) * (.95 + s.x * .09), a * .92);
+      c = mix(c, mix(dark, light, shade) * (.86 + k.x * .22 - .08 * abs(k.y)), a * .85);   // clouds are painted with the same strokes
       star *= 1. - a;
     }
   }
   c += star * uNight * vec3(1., .98, .9);
+  for (int i = 0; i < 2; i++){
+    vec3 o = i == 0 ? uSun : uMoon;
+    if (o.z <= 0.) continue;
+    float d = length(p - o.xy * uRes), R = clamp(uRes.x * .035, 34., 54.);
+    float ring = exp(-d / (R * 2.6)) * (.55 + .45 * sin(d * .16 - uT * 1.1 + k.x * 1.5)) * smoothstep(R * .95, R * 1.3, d);
+    c += ring * o.z * (i == 0 ? vec3(1., .82, .35) * .5 : vec3(.95, .92, .7) * .38);
+  }
   return c;
 }
 void main(){
